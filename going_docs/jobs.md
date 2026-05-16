@@ -2,9 +2,7 @@
 # Jobs
 
 -[Introduction](#introduction)
-
 -[Creating a new job](#Creating-a-new-job)
-
 -[Register a job](#register-a-job)
 
 
