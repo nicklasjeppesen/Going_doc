@@ -1,11 +1,11 @@
 # Websocket
 
 - [Introduction](#introduction)
-- [Creating Websocket](#creating-a-websocket)
-
+- [Creating a websocket](#creating-a-websocket)
 - [use of websocket](#use-of-websocket)
-
-- [Send a Message from the server to the clientt](#send-a-message-from-the-server-to-the-client)
+	- [Register a new websocket](#register-a-new-websocket)
+	- [Add middleware](#add-middleware)
+- [Send a message from the server to the client](#send-a-message-from-the-server-to-the-client)
 - [Frontend](#frontend)
 
 
@@ -14,8 +14,8 @@
 
 This section describe how to start going websocket. going implement web socket by the pattern of using hubs. 
 
-<a name="#creating-a-websocket"></a>
-## Creating Websocket
+<a name="creating-a-websocket"></a>
+## Creating a websocket
 
 Run the command
 ```
@@ -63,10 +63,12 @@ func (MessageHub *PostHub) AppReceiver(message channels.Socket) {
 ```
 This is example on how to hub will look like. 
 
-## Use of websocket
 <a name="use-of-websocket"></a>
+## Use of websocket
+This section will exlain how to use going websocket, for the server side application
 
-### Register the hub
+<a name="register-a-new-websocket"></a>
+### Register a new websocket
 Go to the socket route file here: `myapp/internal/routes/socket.go`, and add register the URL and 
 
 ```go 
@@ -79,6 +81,24 @@ Go to the socket route file here: `myapp/internal/routes/socket.go`, and add reg
 */
 func Socketrouter(socketRouter socket.Router) socket.Router {
 	socketRouter.MapHub("/ws/post", &hubs.PostHub{})
+	return socketRouter
+}
+```
+
+<a name="add-middleware"></a>
+#### Add middleware
+You can also add optional middleare to your middleware request, like this: 
+
+```go 
+/*
+|--------------------------------------------------------------------------
+| Websocket routes
+|--------------------------------------------------------------------------
+|
+| Here is where you can register websocket routes for your application.
+*/
+func Socketrouter(socketRouter socket.Router) socket.Router {
+	socketRouter.MapHub("/ws/post", &hubs.PostHub{}, ...middlewares)
 	return socketRouter
 }
 ```
@@ -153,13 +173,12 @@ func (post *PostHub) handleNewMessage(parameters []string, client *socket.Client
 }
 ```
 
-
-## Send a Message from the server to the client
-<a name="Send-a-message-from-the-server-to-the-client"></a>
+<a name="send-a-message-from-the-server-to-the-client"></a>
+##Send a message from the server to the client
 
 There is 2 way you can send a message, from the hub, or in your controller. 
 
-### Send a message to the client:
+### Send a Message from the server to the client:
 ```go
 
  // Function to send a message to other user in a chat 
@@ -170,7 +189,6 @@ func (messagehub *MessageHub) SendMessage(contents []string, client *socket.Clie
         client.SendMessage(actionClientListenFor, messageToTheClient)	
 	return nil
 }
-
 ```
 
 ### Send message to people in a room
