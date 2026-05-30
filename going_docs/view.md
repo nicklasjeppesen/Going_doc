@@ -1,8 +1,5 @@
 # Views 
 
-# Views
-
-## Indholdsfortegnelse
 - [Introduction](#introduction)
 - [Creating a view](#creating-a-view)
 - [Views structure](#views-structure)
