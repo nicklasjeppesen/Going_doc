@@ -1,13 +1,18 @@
 # Views 
 
+# Views
+
+## Indholdsfortegnelse
 - [Introduction](#introduction)
-
-- [Creating a View](#creating-a-view)
-
+- [Creating a view](#creating-a-view)
 - [Views structure](#views-structure)
+  - [Partial views](#partial-views)
+- [View names convention](#view-names-convention)
+- [Components and sub views](#components-and-sub-views)
+  - [Components](#components)
+- [Other Base view](#other-base-view)
 
-
- 
+---
 
 
 <a name="introduction"></a>
@@ -190,3 +195,31 @@ Simple example of a form section with label and input, This can be used as follo
 ```
 
 Going build in component function first input is the name of the define component, and the a list of parameters in the form of key, value,... 
+
+## Other Base view 
+you dont need to use the base view, provided, you can switch between or not choose any if needed, which can be usefull for for only returning rendered subview from the server. 
+
+Go to controller_base.go 
+
+```go 
+var View = template.TemplateView{BaseView: "base", CustomViewFunctions: viewProvider.GetCustomViewFunction}.View
+```
+Here you can see the basis View varible, with the base view. You can choose to change the path for this like this: 
+
+```go 
+var View = template.TemplateView{BaseView: "bases.base", CustomViewFunctions: viewProvider.GetCustomViewFunction}.View
+```
+so the base is located at: ```resources/views/bases/base.go```or 
+you can define new onces like this: 
+
+```go 
+
+// General view
+var View = template.TemplateView{BaseView: "bases.base", CustomViewFunctions: viewProvider.GetCustomViewFunction}.View
+
+// Subview, does not return any baseView
+var SubView = template.TemplateView{BaseView: "", CustomViewFunctions: viewProvider.GetCustomViewFunction}.View
+
+// return a new view where the base is admin.go
+var AdminView = template.TemplateView{BaseView: "admin", CustomViewFunctions: viewProvider.GetCustomViewFunction}.View
+```
