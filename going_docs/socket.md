@@ -52,7 +52,7 @@ func (post *PostHub) handleNewMessage(parameters []string, client *socket.Client
 
 
 // handler when user is cancle a connection
-func (post *PostHub) CancleConnecetion(client *socket.Client) {
+func (post *PostHub) CancelConnection(client *socket.Client) {
 }
 
 // Handle message send from the app
@@ -130,7 +130,7 @@ func (message *MessageHub) RegisterUser(contents []string, client *socket.Client
 }
 
 // handler when user is cancle a connection
-func (post *PostHub) CancleConnecetion(client *socket.Client) {
+func (post *PostHub) CancelConnection(client *socket.Client) {
 	delete(post.Clients, client.Auth.ID)
 }
 ```
@@ -143,7 +143,7 @@ this
 
 func (message *MessageHub) RegisterUser(contents []string, client *socket.Client) error {
 
-	var customUUID = "43dfggg&dsGv5"
+	var customUUID = "43dfggg&dsGv5" // Random id
     var roomName = "messageRoom"
 	newRoom := message.Rooms.CreateRoomWithCustomUUID(roomName, customUUID)
 	client.RoomID = customUUID
@@ -199,8 +199,8 @@ func (messagehub *MessageHub) SendMessage(contents []string, client *socket.Clie
  */
 func (messagehub *MessageHub) SendMessage(contents []string, client *socket.Client) error {
 
-	var user = new(db.Chat).DB().Where("id", chatId).WithUsers().First()
-	var message = new(db.Message).DB().Where("id", messageId).First()
+	var user = new(db.Chat).DB(context.Background()).Where("id", chatId).WithUsers().First()
+	var message = new(db.Message).DB(context.Background()).Where("id", messageId).First()
 
 	for _, chatMember := range chat.Users().Items() {
 		if client, ok := messagehub.Clients[fmt.Sprint(chatMember.Id)]; ok {
@@ -258,7 +258,8 @@ In going project you also receive a javascript file for handling websocket. you 
 
     socket.onOpen(() => {
         console.log("WebSocket connection opened");
-    })
+		 socket.invoke("RegisterUser");
+	})
 
     socket.onClose(() => {
         console.log("WebSocket connection Closed");
@@ -273,7 +274,7 @@ In going project you also receive a javascript file for handling websocket. you 
 
     // Send message to the server
     function callServer() {
-        socket.invoke("sendMessage", "input fra browser")
+        socket.invoke("sendMessage", "input from browser")
     }
 </script>
 
