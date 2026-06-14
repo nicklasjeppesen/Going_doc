@@ -8,7 +8,7 @@
 - [Components and sub views](#components-and-sub-views)
   - [Components](#components)
 - [Other Base view](#other-base-view)
-
+- [Build in view functions](#build-in-view-functions)
 ---
 
 
@@ -20,7 +20,7 @@ this section describe how to use the view functionality in Going. Going is using
 <a name="creating-a-view"></a>
 ## Creating a view
 
-All views should be place in the folder ressources/views. Views is a function avaiable in your controller, defined in controller_base, which allow you to return a view as shown below. 
+All views should be place in the folder ressources/views. Views is a function available in your controller, defined in controller_base, which allow you to return a view as shown below. 
 
 ```go 
 package controller
@@ -135,7 +135,7 @@ OBS: you should name your partial in the naming convention: 'ContentView_section
 View shall be name after their path and filename. 
 In our example, index is at the top level in views, but you might want to group views in folders. This can be done as follow: 
 
-In the controller you define a path to your view by dot notation. This login will return the view in folder resoueces/views/auth/login.template
+In the controller you define a path to your view by dot notation. This login will return the view in folder resources/views/auth/login.template
  
 ```go 
 type LoginController struct {
@@ -220,3 +220,81 @@ var SubView = template.TemplateView{BaseView: "", CustomViewFunctions: viewProvi
 // return a new view where the base is admin.go
 var AdminView = template.TemplateView{BaseView: "admin", CustomViewFunctions: viewProvider.GetCustomViewFunction}.View
 ```
+
+## Build in view functions
+
+### component 
+Is another build in function, that was described earlier
+
+### render 
+Render is a function that take a template name and data, and execute the template and return html page. it primary used for render main view, in the base view, but can be used to create custom sections, like title, footer and others, like this: 
+
+
+Base view: 
+```go
+    <footer>
+     {{ render (print .ContentView "_footer") . }}
+    </footer>     
+```
+
+now, you can in another view define this value: 
+auth/login.tmpl 
+```go 
+{{ define "auth.login_footer" }}
+    <h5>footer {{ .Title }}</h5>
+{{ end }}
+```
+
+
+### haserrors
+every view is render with a boolean, describe if there was and any error. 
+which is determine by, the error map contain any information. 
+This is how this can be used. 
+```go 
+ {{ if .haserrors }}
+            <div class="mb-4 text-red-600">
+                <p>Error under try to login</p>
+            </div>
+            {{ end }}
+```
+
+#### Get the error message: 
+To get the error message, you can check the value like this. 
+
+```go 
+{{ if index .errors "email" }}
+    <div class="text-red-500 mt-1 text-sm">
+        {{ .errors.email }}
+    </div>
+{{ end }}
+```
+
+
+### old
+Old return the value that was post to your controller, ex. if user create post, that contain information, that information can be display like this.  
+``` go 
+ <input
+    type="email"
+    id="email"
+    name="email"
+    placeholder="Enter your email"
+    class="flex h-10 w-full rounded-md border border-input px-3 py-2 text-base placeholder:text-gray-400 focus:outline-green-600 md:text-sm pl-10"
+    required
+    value="{{ old "email" .}}"
+/>
+```
+
+### csrf token
+For safety, the view provide a csrf function, that he middleware check to see, if a user can execute a given request. 
+
+
+```go 
+ <input type="hidden" name="csrf_token" value="{{ .csrf_token }}" />
+```
+
+### Add your own 
+
+You can add your own build on view functions, that the framework wil register. 
+
+Go to ``` myapp/internal/app/providers/view ```
+There you can add a new entry to the map, the map structure is key: func name, value: func with input. 
