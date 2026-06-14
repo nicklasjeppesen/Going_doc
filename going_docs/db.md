@@ -1,12 +1,9 @@
 # ORM - Database access
 
--[Introduction](#introduction)
-
--[Setup](#setup)
-
--[Get request](#get-request)
-
--[Add routes](#add-routes)
+- [Introduction](#introduction)
+- [Setup](#setup)
+- [Get request](#get-request)
+- [Add routes](#add-routes)
 
 
 

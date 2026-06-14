@@ -1,10 +1,8 @@
 # ORM - Database Relationships
 
--[Introduction - TODO](#introduction)
-
--[Setup - TODO](#Setup)
-
--[BelongsToMorph](#BelongsToMorph)
+- [Introduction - TODO](#introduction)
+- [Setup - TODO](#Setup)
+- [BelongsToMorph](#BelongsToMorph)
 
 
 <a name="introduction"></a>
