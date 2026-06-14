@@ -175,8 +175,14 @@ You can simple create a new template file, han use it as a component, ex.
 // resources/views/shared/input.template
 {{ define "shared.input" }}
 
-<label for="id_{{.Name}}">{{.Title}}</label>
-        <input type="{{or .Type "text"}}" id="id_{{.Name}}" name="{{.Name}}" value="{{.oldValue}}" required>
+    <label for="id_{{.Name}}">{{.Title}}</label>
+    <input 
+        type="{{or (index . "Type") "text"}}" 
+        id="id_{{.Name}}" 
+        name="{{.Name}}" 
+        value="{{ if index . "oldValue" }} {{.oldValue}} {{ end }}" 
+        required
+    >
 {{end}}
 ```
 
@@ -267,6 +273,17 @@ To get the error message, you can check the value like this.
         {{ .errors.email }}
     </div>
 {{ end }}
+```
+
+### hasflash 
+The view also include the hasflash method, which is true, if you parse data with in the response.With function. The data can be showet like this: 
+
+```go 
+{{ if .hasflash }}
+   {{ range $key, $value := .flash }}
+        <h1>{{ $value}} </h1>
+    {{end }}
+{{end}}
 ```
 
 
