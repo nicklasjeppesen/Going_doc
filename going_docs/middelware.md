@@ -1,15 +1,10 @@
 # Middelware 
 
 - [Introduction](#introduction)
-
 - [Creating a middleware](#creating-a-middleware)
-
 - [Middleware on route](#middleware-on-route)
-
 - [middleware groups](#middleware-groups)
-
 - [Register middleware](#register-middleware)
-
 
 <a name="introduction"></a>
 ## Introduction
