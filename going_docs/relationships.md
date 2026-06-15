@@ -94,12 +94,10 @@ The idea is simple. You have an entry table, that has the the information: id, E
 		return entry
 	}
 
-	//* ------------------Relations --------------------------------//
-	func (e *Entry) Relations() IRelationships {
-		return e.CreateRelationShip(IRelationships{
-			"entryable": BelongsToMorph(entryAbles, &e.EntryAble, delegate),
-		})
-	}
+	// * ------------------Relations --------------------------------//
+func (e *Entry) Entryable() BelongsToMorph[IEntry] {
+	return NewBelongsToMorph(entryAbles, e)
+}
 
 	//* ----------- Scopes ----------------------------------------//
 	func (e *Entry) Company() IDB[*Entry] {
@@ -160,6 +158,7 @@ It can be little tricky to understand, but When you need this pattern, it a life
 ### DB Schema: 
 Just to help with the DB schema the entryable schema, even it should be clear to see:
 OBS: This is schema for SQLite DB
+The model, will automatic add able to the end, and assume that
 
 ```sql
 CREATE TABLE IF NOT EXISTS entries (
