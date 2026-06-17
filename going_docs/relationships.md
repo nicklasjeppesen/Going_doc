@@ -76,8 +76,8 @@ The idea is simple. You have an entry table, that has the the information: id, E
     // Models that implement this type  
     var (
 		entryAbles = []IEntry{
-			new(Company).DB(),
-			new(User).DB().With("company"),
+			new(Company).DB(context.Background()),
+			new(User).DB(context.Background()).With("company"),
 		}
 	)
 
@@ -145,7 +145,7 @@ func (e *Entry) Entryable() BelongsToMorph[IEntry] {
 
 
 	//* -------------- Usage ----------------------------//
-	var entries = models.Entry{}.DB().With("entryable").OrderByDesc("id").Company().Get()
+	var entries = models.Entry{}.DB().With("Entryable").OrderByDesc("id").Company().Get()
 	for _, entry := range entries {
 		fmt.Println(entry.EntryAble.Title())
 		fmt.Println(entry.EntryAble.PrintHi())
