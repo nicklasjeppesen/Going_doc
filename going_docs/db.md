@@ -10,9 +10,9 @@
 <a name="introduction"></a>
 ## Introduction
 
-This section introduce how tod use the the build in ORM for Going. 
+This section introduce how to use the the build in ORM for Going. 
 This is very much inspired on how other framework ORM work, and is created to 
-be a payoff between performance and developerment speed. This ORM does not use GO's build in reflection, this is to avoid performance problem but gives som extra time on setup of a database. 
+be a payoff between performance and developerment speed.  
 
 
 <a name="setup"></a>
@@ -64,15 +64,16 @@ func (user *User) columns() Columns {
 ## Get request
 how to use The ORM:
 Its important to call the DB before starting adding info.  
+The DB take in the GO context, which has been a standard for GO DB. So bare so to addd a context the the DB. 
 ```go 
-var users = User{}.DB().Get() // return all users. 
+var users = User{}.DB(context.Background()).Get() // return all users. 
 ```
 
 <a name="Get-request"></a>
 ## Create/Update request
 how to use The ORM: 
 ```go 
-var users = User{}.DB() 
+var users = User{}.DB(context.Background()) 
 user.Name ="Nicklas" 
 user.Age = 30
 user.Email = "njep@Going.com"
@@ -155,5 +156,82 @@ func (c *SampleController) Get() Result {
 	return Response.PrintJson(user)
 }
 ```
-
 Which will return the routes and replace the groupId with 1.
+
+
+
+## Update 
+The update is straight forward, just get the DB record, change the value, and call the update, the ORM will use the primary key for updating the record. See the example below: 
+
+```go 
+var user = db.User{}.DB(context.Background()).Where("id", 1).First()
+	user.Age = 1000
+	if err := user.Update(); err != nil {
+		// Handle error
+	}
+```
+
+## Delete a record
+Delete a record, is as easy as update One, get it, and call delete.
+```go 
+user := new(db.User).DB(context.Background()).Where("id", 3).First()
+	user.Delete()
+```
+
+
+## Select
+If you want to make a custom SQL query, you can choose to Create your struct, and set the DB, and call the Select function, and this will be a clean SQL query, with no assumtion about table, colums and so on. The only thing is that, it will know what DB to connect to. 
+
+## Pagination: 
+It really simple to use pagination in Going ORM, use call the Pagination function, with the number of element per page, and then Going will handle the rest. 
+
+```go 
+
+//url: /sample
+func (c *SampleController) Get(r Request) Result {
+
+	users := db.User{}.DB(r.R.Context()).Pagination(r.R, 3)
+	return Response.PrintJson(users)
+}
+```
+
+Example 
+```json 
+{
+    "current_page": 1,
+    "data": [
+        {
+            "created_at": "0001-01-01T00:00:00Z",
+            "email": "nicklas@live.dk",
+            "id": 1,
+            "name": "Nicklas",
+            "pivots": null,
+            "routes": null,
+            "updated_at": "2026-06-18T19:28:32Z"
+        },
+        {
+            "created_at": "2026-06-14T16:41:07Z",
+            "email": "nanna@live.dk",
+            "id": 2,
+            "name": "Nanna",
+            "pivots": null,
+            "routes": null,
+            "updated_at": "2026-06-17T20:49:50Z"
+        },
+        {
+            "created_at": "2026-06-18T19:23:26Z",
+            "email": "mom@live.dkk",
+            "id": 4,
+            "name": "mom",
+            "pivots": null,
+            "routes": null,
+            "updated_at": "2026-06-18T19:23:26Z"
+        }
+    ],
+    "first_page_url": "/sample?page=1",
+    "next_page_url": "/sample?page=2",
+    "path": "/sample",
+    "per_page": 3,
+    "prev_page_url": ""
+}
+```
