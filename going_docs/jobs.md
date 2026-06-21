@@ -2,20 +2,20 @@
 # Jobs
 
 -[Introduction](#introduction)
--[Creating a new job](#Creating-a-new-job)
+-[Creating a new job](#creating-a-new-job)
 -[Register a job](#register-a-job)
 
 
 
-<a name="introduction"></a>
 ## Introduction
 Jobs define a way to run a period jobs in the background when the server starts
 
 
-<a name="Creating-a-new-job"></a>
 ## Creating a new job
 Jobs can be placed anywhere, but is recomended to be place in `app/jobs/folder`. 
-Down you see a basis template for a background job. 
+
+run the cli command: ``` art make:job CleanupJob ```
+This will createa a new background job
 The jobs print integer from 1-20.
 
 ```go
