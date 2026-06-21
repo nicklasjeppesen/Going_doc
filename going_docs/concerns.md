@@ -1,16 +1,14 @@
 # Mixins 
 
 - [Introduction](#introduction)
-- [Setup](#setup)
-- [Get request](#get-request)
-- [Add routes](#add-routes)
+- [Case](#case)
 
 
 ## Introduction
 Mixin or Concerns (in rails) is just a way to add more functionality to an object. 
 Go use this, naturally, by composition. Going add little extra to this pattern, and try to demostrate how we think this would be usefull for your application by a demostration.
 
-## Senaria: 
+## Case: 
 Let say, in your application, a user can have an image, a post, a comment an so on. how would you implement this, without adding extra column to the database table? 
 We use what rails calls for Polymorphic Associations, and here is how: 
 
