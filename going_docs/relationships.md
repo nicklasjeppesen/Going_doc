@@ -4,6 +4,8 @@
 - [Setup](#Setup)
 - [BelongsTo](#belongsto)
 - [HasOne](#hasone)
+- [HasMany](#hasmany)
+- [Belongs to many](#belongs-to-many)
 - [BelongsToMorph](#belongstomorph)
 
 
@@ -93,6 +95,78 @@ fmt.Println(company.User().Item()) // return user struct
 ### Details 
 Going asumme a given naming convention as before, for making this so simple. 
 When you define "User" in which, it asumme you include the exact name of the User function. Going will call the Company.GetName() function, and add _id, and look up in the user table for a column where this columns is equal company.PrimaryId. 
+
+## HasMany
+Has Many, is similar to hasOne, just that, Going asumme there exists either 0 more many users that belongs to a company. you can reuse the user struct, from the example belongsTo, and chage the company struct, to use a HasMany object. 
+
+
+```go 
+type Company struct {
+	ActiveRecord[*Company] `json:"-" swaggerignore:"true" validate:"-"`
+	Name                   string `json:"name" validate:"required"`
+}
+// DB & columns func
+
+func (c *Company) User() HasMany[*User] {
+	return NewHasMany(new(User).DB(c.GetCtx()), c)
+}
+```
+How to use it
+```go 
+company := new(db.Company).DB(context.Background()).WithUser().First()
+	for _, user := range company.User().Items() {
+		fmt.Println(user.ToJson()) // print the user struct in a json format
+	}
+```
+
+
+## Belongs to many
+association creates a direct many-to-many relationship with another model, with no intervening model. This association indicates that each instance of the declaring model refers to zero or more instances of another model.
+
+You can implement many-to-many like this: 
+```go 
+func (c *Company) Users() BelongsToMany[*User] {
+	return NewBelongsToMany(new(User).DB(c.GetCtx()), c)
+}
+
+func (c *Company) WithUsers() *Company {
+	return c.With("Users")
+}
+```
+
+And use it like this: 
+
+```go 
+company := new(db.Company).DB(context.Background()).WithUsers().First()
+	for _, user := range company.Users().Items() {
+		fmt.Println(user.Name)
+	}
+```
+
+The DB is expected to have the the following table: "company_user", with the columns: 
+* company_id
+* user_id
+
+
+### Pivots columns 
+It is possible to include extra column to the pivot table, ex. active column. It can be included like the following: s
+
+```go 
+func (c *Company) Users() BelongsToMany[*User] {
+	return NewBelongsToMany(new(User).DB(c.GetCtx()), c).PivotCols("active")
+}
+```
+
+```go 
+	company := new(db.Company).DB(context.Background()).WithUsers().First()
+	for _, user := range company.Users().Items() {
+		fmt.Println(user.Name)
+		fmt.Println(user.Pivots["active"]) // print the active columns 
+	}
+```
+
+
+
 
 ## BelongsToMorph
 
