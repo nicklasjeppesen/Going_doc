@@ -1,19 +1,99 @@
 # ORM - Database Relationships
 
-- [Introduction - TODO](#introduction)
-- [Setup - TODO](#Setup)
-- [BelongsToMorph](#BelongsToMorph)
+- [Introduction](#introduction)
+- [Setup](#Setup)
+- [BelongsTo](#belongsto)
+- [HasOne](#hasone)
+- [BelongsToMorph](#belongstomorph)
 
 
-<a name="introduction"></a>
 ## Introduction
-
-<a name="Setup"></a>
-## Setup
+Going Activerecord a set of options for creating relationsship between your objects. Classic relationships you would know. 
 
 
+## Belongsto 
+A belongsto association sets up a relationship with another model, such that each instance of the declaring model "belongs to" one instance of the other model. For example, if your application includes company and users, and each user can be assigned to exactly one company, you'd declare the user model this way:
 
-<a name="BelongsToMorph"></a>
+```go 
+type User struct {
+	ActiveRecord[*User] `json:"-" swaggerignore:"true" validate:"-"`
+	Name                string `json:"name" validate:"required"`
+	Age                 int64  `json:"age" validate:"min=0,max=99"`
+	Email               string `json:"email" validate:"required"`
+	Password            string `json:"password" validate:"required" hidden:"true"`
+	SessionToken        string `json:"-" hidden:"true"`
+	Company_id          int64  // foreign Id
+}
+
+func (user *User) columns() Columns {
+	return Columns{
+		// Column		  "values"
+		"age":          &user.Age,
+		"name":         &user.Name,
+		"email":        &user.Email,
+		"password":     &user.Password,
+		"sessiontoken": &user.SessionToken,
+		"company_id":   &user.Company_id,
+	}
+}
+// set up the relationship
+func (user *User) Company() BelongsTo[*Company] {
+	return NewBelongsTo(new(Company).DB(user.GetCtx()), user)
+}
+```
+
+how to use this? 
+
+```go 
+user := new(db.User).DB(context.Background()).With("Company").First()
+	fmt.Println(user.Company().Item()) // return Company struct
+```
+
+### Details
+The magic is, here is, you create a new function Called Company, and in then add your current user and company. Going will assume you follow a given convention for naming your foreign_id DB column. Going will call company.GetName() function and add _id at the end, for looking for the id in user struct, and then get the company struct. 
+
+
+## HasOne
+A hasOne association indicates that one other model has a reference to this model. That model can be fetched through this association.
+
+For example, if each company in your application has only one user, you'd declare the company model like this:
+
+```go 
+type Company struct {
+	ActiveRecord[*Company] `json:"-" swaggerignore:"true" validate:"-"`
+	Name                   string `json:"name" validate:"required"`
+}
+// DB & columns func
+
+func (c *Company) User() HasOne[*User] {
+	return NewHasOne(new(User).DB(c.GetCtx()), c)
+}
+```
+
+### how to use it: 
+
+``` go
+company := new(db.Company).DB(context.Background()).With("User").First()
+fmt.Println(company.User().Item()) // return user struct
+```
+
+You can also define a helper function, to avoid string conflict, like this: 
+```GO 
+func (c *Company) WithUser() *Company {
+	return c.With("User")
+}
+```
+Use:
+```go
+company := new(db.Company).DB(context.Background()).WithUser().First()
+fmt.Println(company.User().Item()) // return user struct 
+```
+
+
+### Details 
+Going asumme a given naming convention as before, for making this so simple. 
+When you define "User" in which, it asumme you include the exact name of the User function. Going will call the Company.GetName() function, and add _id, and look up in the user table for a column where this columns is equal company.PrimaryId. 
+
 ## BelongsToMorph
 
 Why is this usefull? 
@@ -52,9 +132,9 @@ The idea is simple. You have an entry table, that has the the information: id, E
 		PrintHi() string
 	}
 
-    //The struct that can be Implemented into the struct in models to make them delegatable entries
-    type EntryAble struct {
-    }
+	//The struct that can be Implemented into the struct in models to make them delegatable entries
+	type EntryAble struct {
+	}
 
 	func (e *EntryAble) PrintHi() string {
 		return "Hi from EntryAble"
@@ -95,9 +175,9 @@ The idea is simple. You have an entry table, that has the the information: id, E
 	}
 
 	// * ------------------Relations --------------------------------//
-func (e *Entry) Entryable() BelongsToMorph[IEntry] {
-	return NewBelongsToMorph(entryAbles, e)
-}
+	func (e *Entry) Entryable() BelongsToMorph[IEntry] {
+		return NewBelongsToMorph(entryAbles, e)
+	}
 
 	//* ----------- Scopes ----------------------------------------//
 	func (e *Entry) Company() IDB[*Entry] {
