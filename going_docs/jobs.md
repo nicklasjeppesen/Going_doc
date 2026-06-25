@@ -1,9 +1,9 @@
 
 # Jobs
 
--[Introduction](#introduction)
--[Creating a new job](#creating-a-new-job)
--[Register a job](#register-a-job)
+- [Introduction](#introduction)
+- [Creating a new job](#creating-a-new-job)
+- [Register a job](#register-a-job)
 
 
 

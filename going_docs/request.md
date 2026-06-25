@@ -7,7 +7,7 @@
 ## Introduction 
 This section describe a request can be handle using Going build in request method. 
 
-## Basis GO request wnd write
+## Basis GO request 
 
 ```go
 auth.Email = r.R.FormValue("email")
@@ -17,7 +17,7 @@ auth.Password = r.R.FormValue("password")
 R is going Requet, so yo can retrive the request.R.Context(), and other information if needed. 
 
 ### Auth user
-You can get the authenticated user from the request very easy (NOTE, if the middleware JWTMiddleware is added to the URL)
+You can get the authenticated user from the request very easy (NOTE, only if the middleware JWTMiddleware is added to the route)
 
 ```go 
 func (c *VideoCallController) Show(request Request) {
