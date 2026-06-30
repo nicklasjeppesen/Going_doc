@@ -33,10 +33,10 @@ Going make it very easy to retrive data from the user, ex. data from user, no ma
 ```Go 
 type Message struct {
 	ActiveRecord[*Message] `json:"-" swaggerignore:"true" validate:"-"`
-	Type                   int64  `json:"type" validate:"required"`
-	Chat_id                int64  `json:"chat_id" validate:"required"`
-	Sender_id              int64  `json:"sender_id" validate:"required"`
-	Messages               string `json:"messages" validate:"required"`
+	Type                   int64  `form:"type" json:"type" validate:"required"`
+	Chat_id                int64  `form:"chat_id" json:"chat_id" validate:"required"`
+	Sender_id              int64  `form:"sender_id" json:"sender_id" validate:"required"`
+	Messages               string `form:"messages" json:"messages" validate:"required"`
 }
 ```
 You can have this struct, dont need to be an ActiveRecord struct, with property tag. It can be used like this: 
@@ -52,3 +52,4 @@ func (c *MessageController) Create(request RequestBody[db.Message]) Result {
 }
 ```
 Request.Body return the struct, after Going has parsed the data to it, then we set up the DB, where Active record first validate the data, and continue to save to the DB if no errors. 
+OBS: remember to add the form tag, if you get info from a html form, or add json, if you get info from a json body
