@@ -28,7 +28,7 @@ func (c *VideoCallController) Show(request Request) {
 ```
 
 ## Request body 
-Going make it very easy to retrive data from the user, ex. data from user, no matter it json or form request, going will check the header, and decide where to parse the data from. Ex. 
+Going make it very easy to retrive data from the user, ex. data from user, no matter it json or form request, going will check the header, and decide where to parse the data from. just add form and json tag, to the field. 
 
 ```Go 
 type Message struct {
