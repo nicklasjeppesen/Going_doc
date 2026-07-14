@@ -70,7 +70,7 @@ func (home *HomeController) Index(request Request) {
 }
 ```
 
-You can then use this ID to fetch the full user from the database:
+You can then use this ID to fetch the full user from the database.:
 
 ```go
 func (c *VideoCallController) Show(request Request) {
