@@ -1,40 +1,46 @@
 # Authentication
 
 - [Introduction](#introduction)
+- [Register user](#register-user)
 - [Login](#login)
+- [Logout](#logout)
 - [Get Authenticated user](#get-authenticated-user)
- 
+
 
 ## Introduction
 
-Going Support basis autentication, that you would expect from a simple application. 
+Going supports basic authentication with JWT-based session tokens and bcrypt password hashing. The auth system is built into the `super/auth` package and works with the middleware layer.
 
 
 ## Register user
-For register a new user, you should just make a post request to the server. 
-For storing password, you can use the build in functionality of hashPassword, for hashing a user password. 
-```go 
-// Post method for register a new user
-func (register *RegisterController) Register(r Request) Result {
-	user := new(models.User).DB(r.R.Context())
-	user.Name = r.R.FormValue("name")
-	user.Email = r.R.FormValue("email")
-	user.Password = security.HashPassword(r.R.FormValue("password"))
-	user, _ = user.Save()
+For registering a new user, make a POST request to the server. Use `security.HashPassword()` to hash the password before storing it.
+
+```go
+// Post method for registering a new user
+func (register *RegisterController) Register(r Request) Result{
+    user := new(models.User).DB(r.R.Context())
+    user.Name = r.R.FormValue("name")
+    user.Email = r.R.FormValue("email")
+    user.Password = security.HashPassword(r.R.FormValue("password"))
+    user.Save()
+
+ // return view
 }
 ```
 
 
 
 ## Login
-For Login, you should create a simple post form, with email, and password, and send a request to the server,
+For login, create a POST form with email and password, and send a request to the server.
 
-```go 
+The `auth.Auth` struct handles the authentication flow: it looks up the user by email, verifies the password hash, generates a JWT token, stores it in the database, and sets it as a cookie.
+
+```go
 // Post action for login
-func (login *LoginController) Login(r Request) Result {
-	auth := r.Auth()
-	auth.Email = r.R.FormValue("email")
-	auth.Password = r.R.FormValue("password")
+func (login *LoginController) Login(r Request) Result{
+    auth := r.Auth()
+    auth.Email = r.R.FormValue("email")
+    auth.Password = r.R.FormValue("password")
 
 	if auth.Attempt() {
 		return Response.Redirect("/protected")
@@ -50,10 +56,9 @@ func (login *LoginController) Login(r Request) Result {
 
 ## Get Authenticated user
 
-For getting the Authenticated user, the first thing, is you have to add the authentication middleware to your route, that setting the information. 
-add the middleware JWTMiddleare to your route Like this, See the section middleware for more options.
+To get the authenticated user, add the `JWTMiddleware` to your route. This middleware reads the session cookie, verifies the JWT, extracts the user ID, and injects it into the request context.
 
-```go 
+```go
 webrouter.GET("/protected", loginController.Protected).AddMiddleware(middleware.JWTMiddleware)
 ```
 
@@ -62,5 +67,16 @@ Now you can get an authenticated in the controller like this
 func (home *HomeController) Index(request Request) {
 	authUserId := request.Auth().GetUserId()
 	fmt.Println("userId: ", authUserId)
+}
+```
+
+You can then use this ID to fetch the full user from the database:
+
+```go
+func (c *VideoCallController) Show(request Request) {
+    user := new(db.User).DB(request.R.Context()).
+        Where("id", request.Auth().GetUserId()).
+        First()
+    // use user...
 }
 ```
