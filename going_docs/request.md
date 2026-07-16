@@ -1,55 +1,137 @@
 # Request
 
 - [Introduction](#introduction)
+- [Basic request handling](#basic-request-handling)
+- [Requestbase](#requestbase)
+- [Authenticated user](#authenticated-user)
+- [Request body](#request-body)
+- [Validation](#validation)
+- [Reflection-based parameter injection](#reflection-based-parameter-injection)
 
 
+## Introduction
 
-## Introduction 
-This section describe a request can be handle using Going build in request method. 
+This section describes how to handle requests using Going's built-in request handling. Going provides a custom request wrapper and a reflection-based function dispatcher that automatically injects parameters into controller methods.
 
-## Basis GO request 
+
+## Basic request handling
+
+The `Requestbase` struct wraps Go's standard `http.ResponseWriter` and `*http.Request`:
 
 ```go
-auth.Email = r.R.FormValue("email")
-auth.Password = r.R.FormValue("password")
+func controller(r Request) {
+    // Access the standard Go request
+    email := r.R.FormValue("email")
+    password := r.R.FormValue("password")
+    ctx := r.R.Context()
+
+    // Access the response writer
+    fmt.Fprint(r.W, "Hello")
+}
 ```
 
-R is going Requet, so yo can retrive the request.R.Context(), and other information if needed. 
 
-### Auth user
-You can get the authenticated user from the request very easy (NOTE, only if the middleware JWTMiddleware is added to the route)
+## Request
 
-```go 
+Available methods:
+
+- `r.R.FormValue("key")` - Get form/query values
+- `r.R.Context()` - Get the request context
+- `r.PrintJson(v)` - Write JSON response
+- `r.Auth()` - Get the auth struct (requires JWT middleware)
+- `r.Validate()` - Validate the request
+- `r.GetInputs()` - Get all form inputs as a map
+
+
+## Authenticated user
+Get the authenticated user from the request (only if the `JWTMiddleware` is added to the route):
+
+```go
 func (c *VideoCallController) Show(request Request) {
-	var user = new(db.User).DB(request.R.Context()).
-		Where("id", request.Auth().GetUserId()).
-		First()
+    user := new(db.User).DB(request.R.Context()).
+        Where("id", request.Auth().GetUserId()).
+        First()
 }
 ```
 
-## Request body 
-Going make it very easy to retrive data from the user, ex. data from user, no matter it json or form request, going will check the header, and decide where to parse the data from. just add form and json tag, to the field. 
+See the [Authentication](authentication.md) section for details on login and middleware setup.
 
-```Go 
+
+## Request body
+
+Going makes it easy to receive data from the user, whether it's JSON or form data. Going checks the `Content-Type` header and parses accordingly.
+
+Define a struct for the request body:
+
+```go
 type Message struct {
-	ActiveRecord[*Message] `json:"-" swaggerignore:"true" validate:"-"`
-	Type                   int64  `form:"type" json:"type" validate:"required"`
-	Chat_id                int64  `form:"chat_id" json:"chat_id" validate:"required"`
-	Sender_id              int64  `form:"sender_id" json:"sender_id" validate:"required"`
-	Messages               string `form:"messages" json:"messages" validate:"required"`
+    ActiveRecord[*Message] `json:"-" swaggerignore:"true" validate:"-"`
+    Type                   int64  `json:"type" form:"type" validate:"required"`
+    Chat_id                int64  `json:"chat_id" json:"chat_id" validate:"required"`
+    Sender_id              int64  `json:"sender_id" json:"sender_id" validate:"required"`
+    Messages               string `json:"messages" json:"messages" validate:"required"`
 }
 ```
-You can have this struct, dont need to be an ActiveRecord struct, with property tag. It can be used like this: 
 
+The struct does not need to be an `ActiveRecord` - any struct with property tags works.
 
-```go 
-func (c *MessageController) Create(request RequestBody[db.Message]) Result {
-	if result, err := request.Body.DB(request.R.Context()).Save(); err == nil {
-		return Response.PrintJson(result)
-	} else {
-		return Fail.StatusBadRequest(err.Error())
-	}
+Use `RequestBody[T]` in your controller to automatically parse the body:
+
+```go
+func (c *MessageController) Create(request RequestBody[db.Message]) {
+    result, err := request.Body.DB(request.R.Context()).Save()
+    if err != nil {
+       return Fail.StatusBadRequest(err.Error())
+    }
+    Response.PrintJson(result)
 }
 ```
-Request.Body return the struct, after Going has parsed the data to it, then we set up the DB, where Active record first validate the data, and continue to save to the DB if no errors. 
-OBS: remember to add the form tag, if you get info from a html form, or add json, if you get info from a json body
+
+`request.Body` returns the parsed struct after Going has deserialized the request body into it.
+
+
+## Validation
+
+Validate the request body using the built-in validation:
+
+```go
+func (c *MessageController) Create(request RequestBody[db.Message]) {
+    if result := request.Validate(); result.HasError {
+        return Response.PrintJson(result.GetErrors())
+    }
+    // proceed with valid data...
+}
+```
+
+See the [Validation](validation.md) section for details on validation rules and custom validators.
+
+
+## Reflection-based parameter injection
+
+Going uses reflection to automatically resolve function parameters in controller methods. When a route is registered with a method name, the framework inspects the function signature and injects the appropriate arguments:
+
+### Supported parameter types
+
+| Type | Resolution |
+|------|-----------|
+| `http.ResponseWriter` | Injected directly from the request |
+| `*http.Request` | Injected directly from the request |
+| `request.Requestbase` | Wraps `w` and `r` |
+| `request.RequestBodybase[T]` | Parses request body into `T` |
+| `int` | Parsed from URL path parameters |
+| `string` | Taken from URL path parameters |
+
+### Example
+
+```go
+// Route definition
+webrouter.GET("/users/{id}", userController.Show)
+
+// Controller method - parameters are injected automatically
+func (c *UserController) Show(r Request, id int) {
+    user := new(db.User).DB(r.R.Context()).Where("id", id).First()
+    return Response.PrintJson(user)
+}
+```
+
+The `id` parameter is automatically extracted from the URL path `/users/123` and passed as an `int` to the controller method.
