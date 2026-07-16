@@ -1,118 +1,294 @@
 # Router
 
 - [Introduction](#introduction)
-- [use of basis router](#use-of-basis-router)
-- [Create new router group](#create-new-router-group)
+- [Basic routing](#basic-routing)
+- [Route types](#route-types)
+- [Route to controller](#route-to-controller)
+- [Controller structure](#controller-structure)
+- [Naming routes](#naming-routes)
+- [Route parameters](#route-parameters)
+- [Middleware on routes](#middleware-on-routes)
+- [Route groups](#route-groups)
+- [DI Container](#di-container)
+- [Controller lifecycle](#controller-lifecycle)
 
 
 ## Introduction
-The Going web router, is a basis router. 
+
+The Going web router wraps Go's `http.ServeMux` with Laravel-style features: route groups, path parameter extraction, named routes, middleware chaining, a DI container, and a controller lifecycle with before/after action hooks.
 
 
-for simple hello world, go to the folder routes and choose web.go 
-```go 
+## Basic routing
+
+In your routes folder (e.g. `routes/web.go`):
+
+```go
 webrouter.GET("/hello", func(w http.ResponseWriter, r *http.Request) {
     fmt.Fprint(w, "Hello world")
 })
 ```
 
-### Types: 
-The router support all the classic route types, as Go servemux support, and will also be registered as you was writing pure servemux
 
-```go 
-webrouter.GET()
-webrouter.POST()
-webrouter.OPTIONS()
-Webrouter().DELETE()
-Webrouter().PATCH()
-```
+## Route types
 
-
-
-### Route to Controller: 
-You can direct a route to a controller method, like this
+The router supports all standard HTTP methods:
 
 ```go
-func Webrouter() *web.MyRouter {
+webrouter.GET(path, handler, methodName...)
+webrouter.POST(path, handler, methodName...)
+webrouter.PUT(path, handler, methodName...)
+webrouter.DELETE(path, handler, methodName...)
+webrouter.PATCH(path, handler, methodName...)
+webrouter.OPTIONS(path, handler, methodName...)
+```
 
-	webrouter := web.NewMyRouter()
 
-	var homeController = HomeController{}
-	webrouter.GET("/", homeController.Home).Name("home.front")
-	return webrouter
+## Route to controller
+
+You can direct a route to a controller method:
+
+```go
+func Webrouter() *customrouter.MyRouter {
+    webrouter := customrouter.NewMyRouter()
+    var homeController = HomeController{}
+
+    webrouter.GET("/", homeController.Home).Name("home.front")
+    return webrouter
 }
 ```
-The controller will look like this: 
 
-```go 
+When a `methodName` is provided as the last argument, the router uses reflection-based controller dispatch with DI and lifecycle hooks:
+
+```go
+webrouter.GET("/", homeController, "Home").Name("home.front")
+```
+
+
+## Controller structure
+
+Controllers embed `BaseController` which provides before/after action hooks:
+
+```go
 package controller
 
+import "github.com/nicklasjeppesen/going_internal/super/customrouter"
+
 type HomeController struct {
-	ControllerBase
+    ControllerBase
 }
 
-func (c *HomeController) Home() Result {
-	return View("index", Params{"Title": "Going App", "Message": "Welcome to Going"})
+func (c *HomeController) Home(r request.Requestbase) {
+    Response.Print("Hello from Home")
 }
 ```
 
-### Naming route: 
-You can add a name to a route, that can be used later, like this: 
+The framework automatically resolves controller dependencies via the DI container and injects parameters into action methods using reflection. See [Controller lifecycle](#controller-lifecycle) for details.
 
-```go 
+
+## Naming routes
+
+You can add a name to a route for URL generation later:
+
+```go
 webrouter.GET("/", homeController.Home).Name("home.front")
 ```
-See db for further use. 
+
+Using named routes in the ORM:
+
+```go
+users := models.User{}.DB(ctx).AddRoutes("home").Get()
+```
+
+See the [Database](db.md) section for more details on using named routes with the ORM.
 
 
-### Route input 
+## Route parameters
 
-You can also add a parameter to the route like this: 
- 
-```go 
+Add path parameters with curly braces. The parameter name must match the controller method argument name:
+
+```go
 webrouter.GET("/call/room/{roomId}", videoCallController.Show)
 ```
-Which in the controller is handle like this: 
+
+The controller receives the parameter via reflection:
 
 ```go
-func (c *VideoCallController) Show(request Request, roomId string) Result {
-	var user = new(db.User).DB(request.R.Context()).
-		Where("id", request.Auth().GetUserId()).
-		First()
+func (c *VideoCallController) Show(request Request, roomId string) {
+    user := new(db.User).DB(request.R.Context()).
+        Where("id", request.Auth().GetUserId()).
+        First()
 
-	return View("call.show", Params{"room": roomId, "user": user})
+    // use roomId...
 }
 ```
-NOTE: it is important that the parameter name is equal to the name on the route URL, thats the only way, Going can parse this. 
 
-##  Middleware 
+**Important**: The parameter name in the URL must exactly match the variable name in the controller method signature. The router extracts parameters by name from the URL path.
 
-For a single URL, you can add a middleware with dot after the router: 
-```go 
-	webrouter.GET("/protected", loginController.Protected).AddMiddleware(middleware.JWTMiddleware)
-```
 
-### Route groups
-If you need to add a prefix, or middleware for a large groups of URLs, like user need to be login, you can register an entire webgroup 
+## Middleware on routes
 
-Create new file in routes / or other folder you like. create a function that return a *web.MyRouter, add your URLs. For going knowing these URL's, go to ``` internal/app/provider/route/routeservice.go```
-
-Start by create a new function that return *webstdlib.MyRouter, the function should return your newly created routergroup. 
-
-```go 
-func mapSampleRoute() *webstdlib.MyRouter {
-	return webrouter.Samplerouter(). // Your new router
-		AddmiddlewareGroup(middleware.WebMiddlewareGroup()). // Optional, to return an 
-		Addmiddleware(internalMiddelware.JWTMiddleware). // optional, Can be call multiple times 
-		Addprefix("/sample") // Optional, create a prefix, for an entire routing group
-}
-```
-When you have create the function, it time to register your routes, That is done in the function map, where your routing group, have a method that take GO's router, r *http.Sermux, and register all your routes. 
+Add middleware to a single route using `.AddMiddleware()`:
 
 ```go
+webrouter.GET("/protected", loginController.Protected).AddMiddleware(middleware.JWTMiddleware)
+```
+
+Chain multiple middlewares:
+
+```go
+webrouter.GET("/admin", adminController.Index).
+    AddMiddleware(middleware.JWTMiddleware).
+    AddMiddleware(middleware.CorsMiddleware)
+```
+
+
+## Route groups
+
+For adding prefixes or middleware to large groups of URLs, create route group functions and register them.
+
+Create a new route file and define a function returning `*customrouter.MyRouter`:
+
+```go
+func mapSampleRoute() *customrouter.MyRouter {
+    return webrouter.Samplerouter().
+        AddmiddlewareGroup(middleware.WebMiddlewareGroup()).
+        Addmiddleware(middleware.JWTMiddleware).
+        Addprefix("/sample")
+}
+```
+
+Register all route groups in your route service provider:
+
+```go
+type RouteServiceProvider struct{}
+
 func (route *RouteServiceProvider) Map(r *http.ServeMux) {
-	mapwebRoute().RegisterRoutes(r)    // register the general Web provider
-	mapSampleRoute().RegisterRoutes(r) // register new workspace
+    mapwebRoute().RegisterRoutes(r)
+    mapSampleRoute().RegisterRoutes(r)
 }
 ```
-And then you are done! 
+
+You can also use the `Group()` method to create sub-routers with path prefixes:
+
+```go
+func SampleRouter() *customrouter.MyRouter {
+    r := customrouter.NewMyRouter()
+
+    api := r.Group("/api")
+    api.Middleware(middleware.JWTMiddleware)
+    api.GET("/users", userController.Index)
+    api.GET("/users/{id}", userController.Show)
+
+    return r
+}
+```
+
+
+## DI Container
+
+Going includes a dependency injection container for resolving controller dependencies automatically.
+
+### Register dependencies
+
+Create a container and register your services:
+
+```go
+container := customrouter.NewContainer()
+
+// Register a service - the return type becomes the key
+container.Register(func() *services.UserService {
+    return services.NewUserService()
+})
+
+// Register another service
+container.Register(func() *services.MailService {
+    return services.NewMailService()
+})
+```
+
+### Use with router
+
+Wire the container into your router:
+
+```go
+webrouter.UseContainer(container)
+```
+
+### Resolve in controllers
+
+When a controller has a `Loader()` method, the framework resolves its parameters from the container:
+
+```go
+type UserController struct {
+    ControllerBase
+}
+
+func (c *UserController) Loader(userService *services.UserService, mailService *services.MailService) *UserController {
+    // Services are injected by the DI container
+    c.userService = userService
+    return c
+}
+
+func (c *UserController) Index(r request.Requestbase) {
+    users := c.userService.GetAll()
+    response.NewResponse().PrintJson(users).ServeHTTP(r.W, r.R)
+}
+```
+
+The container uses a singleton pattern - dependencies are created once and cached for subsequent resolutions.
+
+
+## Controller lifecycle
+
+Controllers support before/after action hooks, inspired by Rails:
+
+### Before actions
+
+```go
+type AdminController struct {
+    ControllerBase
+}
+
+func (c *AdminController) init() {
+    c.AddBeforeAction(customrouter.BeforeAction{
+        Handler: func(r request.Requestbase) bool {
+            // Return true to continue, false to abort
+            userId := r.Auth().GetUserId()
+            return userId > 0
+        },
+    })
+}
+```
+
+### After actions
+
+```go
+func (c *AdminController) init() {
+    c.AddAfterAction(customrouter.AfterAction{
+        Handler: func(r request.Requestbase) {
+            // Runs after the action method
+            log.Println("Request completed")
+        },
+    })
+}
+```
+
+### Filtering with Only/Except
+
+Restrict hooks to specific action methods:
+
+```go
+c.AddBeforeAction(customrouter.BeforeAction{
+    Handler: func(r request.Requestbase) bool {
+        return r.Auth().GetUserId() > 0
+    },
+    Only: []string{"Index", "Show"}, // Only run for these actions
+})
+
+c.AddAfterAction(customrouter.AfterAction{
+    Handler: func(r request.Requestbase) {
+        log.Println("Action completed")
+    },
+    Except: []string{"Login"}, // Run for all actions except Login
+})
+```
