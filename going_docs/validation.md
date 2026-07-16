@@ -1,55 +1,137 @@
 # Validation
 
 - [Introduction](#introduction)
-- [Create validation](#create-validation)
-- [Validation in controller](#Validation-in-controller)
+- [Basic validation](#basic-validation)
+- [Validation in controller](#validation-in-controller)
+- [Error messages](#error-messages)
+- [Custom validation rules](#custom-validation-rules)
+- [Custom per-struct validation](#custom-per-struct-validation)
 
 
-## Introduction 
-This section describe how to use use validation to validate input from the user. 
-Going is using the Google playground basis validator, for simply validate input. see github for that: https://github.com/go-playground/validator
+## Introduction
 
-This mean you can create a struct, and add the validate struct to it, like this: 
+This section describes how to use validation to validate input from the user. Going uses the [go-playground/validator](https://github.com/go-playground/validator) package with customizable error messages loaded from a JSON configuration file.
+
+
+## Basic validation
+
+Add `validate` struct tags to your fields. The validation is powered by `go-playground/validator`:
 
 ```go
 type InputStore struct {
-	Id    int64  `json:"id" validate:"number,required,min=30"`
-	Name  string `json:"name" validate:"required"`
-	Email string `json:"e-mail" validate:"required"`
+    Id    int64  `json:"id" validate:"number,required,min=30"`
+    Name  string `json:"name" validate:"required"`
+    Email string `json:"email" validate:"required,email"`
 }
 ```
-For validate input in your controller, you can check the result like the following: 
 
-```go 
-func (c *TestcontrollerController) Store(r RequestBody[*InputStore]) Result {
+Common validation tags:
+- `required` - Field must be present
+- `email` - Must be a valid email
+- `min=X` / `max=X` - Minimum/maximum value or length
+- `number` - Must be a number
+- `oneof=a b c` - Must be one of the specified values
 
-	if result := r.Validate(); result.Error {
-		return Response.PrintJson(result.ErrorMessage.Error())
-	}
-	return Response.PrintJson(r.Body)
+See the [validator documentation](https://github.com/go-playground/validator) for all available tags.
+
+
+## Validation in controller
+
+When using `RequestBodybase[T]`, call `Validate()` to validate the input:
+
+```go
+func (c *TestController) Store(r request.RequestBodybase[*InputStore]) {
+    if result := r.Validate(); result.HasError {
+        // Validation failed
+        Response.WithErrors(result.GetErrors()).Back()
+        return
+    }
+    // Validation passed, use r.Body
+    Response.PrintJson(r.Body)
 }
 ```
-Going will parse the input to the struct, and validate the input for you.
+
+`Validate()` returns a `*Result[T]` with:
+- `HasError` - Whether validation failed
+- `Errors` - Map of field names to error messages
 
 
-## Custom validation 
-Some time, you need more custom validation for a given model. You add a the func Validate() error to your model, which can hold custom validation rules. 
+## Error messages
 
-Se the example below: 
+Going uses a `rules.json` file (at `internal/resources/rules/rules.json`) to define custom error messages. This allows you to provide human-readable error messages instead of the default validator messages.
 
-```go 
+### Default messages
+
+Set default messages for each validation tag:
+
+```json
+{
+    "default_messages": {
+        "required": "The {field} field is required",
+        "email": "Please enter a valid email address",
+        "min": "The {field} must be at least {param} characters"
+    }
+}
+```
+
+### Field-specific messages
+
+Override messages for specific struct fields:
+
+```json
+{
+    "field_messages": {
+        "InputStore": {
+            "email": {
+                "required": "Email address is required for registration",
+                "email": "Please enter a valid email address"
+            }
+        }
+    }
+}
+```
+
+### Registering custom validation rules
+
+Register custom validation rules at startup using `RegisterValidation()`:
+
+```go
+import "github.com/nicklasjeppesen/going_internal/super/validation"
+
+func init() {
+    validation.RegisterValidation("even", func(fl validator.FieldLevel) bool {
+        value := fl.Field().Int()
+        return value%2 == 0
+    })
+}
+```
+
+Then use the custom tag in your struct:
+
+```go
+type Input struct {
+    Number int64 `json:"number" validate:"even"`
+}
+```
+
+
+## Custom per-struct validation
+
+For complex business logic rules, implement the `Validator` interface on your struct:
+
+```go
 type InputStore struct {
-	Id    int64  `json:"id" validate:"number,required"`
-	Name  string `json:"name" validate:"required"`
-	Email string `json:"e-mail" validate:"required"`
+    Id    int64  `json:"id" validate:"number,required"`
+    Name  string `json:"name" validate:"required"`
+    Email string `json:"email" validate:"required"`
 }
 
-// Simple example
 func (i *InputStore) Validate() error {
-	if i.Id <= 30 {
-		return errors.New("Id value shall be minimum 30")
-	}
-	return nil
+    if i.Id <= 30 {
+        return errors.New("Id value must be minimum 30")
+    }
+    return nil
 }
 ```
-This is a simple example, for demostrating specific rules, could be usefor for look up values in DB etc. 
+
+This method is called after the struct tag validation, allowing you to add business rules like database lookups or cross-field validation.
