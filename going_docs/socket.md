@@ -1,230 +1,231 @@
-# Websocket
+# WebSocket
 
 - [Introduction](#introduction)
-- [Creating a websocket](#creating-a-websocket)
-- [use of websocket](#use-of-websocket)
-	- [Register a new websocket](#register-a-new-websocket)
-	- [Add middleware](#add-middleware)
-- [Send a message from the server to the client](#send-a-message-from-the-server-to-the-client)
+- [Creating a hub](#creating-a-hub)
+- [Registering a hub](#registering-a-hub)
+- [Middleware](#middleware)
+- [Authenticated user](#authenticated-user)
+- [Storing clients](#storing-clients)
+  - [Hub storage](#hub-storage)
+  - [Rooms](#rooms)
+- [Receiving messages](#receiving-messages)
+- [Sending messages](#sending-messages)
+  - [From hub to client](#from-hub-to-client)
+  - [To a room](#to-a-room)
+  - [From controller to hub](#from-controller-to-hub)
+- [App-to-socket messaging](#app-to-socket-messaging)
 - [Frontend](#frontend)
 
 
-<a name="introduction"></a>
 ## Introduction
 
-This section describe how to start going websocket. going implement web socket by the pattern of using hubs. 
+Going implements WebSocket support using a hub-based architecture with room management, event routing, and integration with the application layer via an internal channel system.
 
-<a name="creating-a-websocket"></a>
-## Creating a websocket
 
-Run the command
+## Creating a hub
+
+Run the CLI command to generate a hub:
+
 ```
 art make:hub post
 ```
-This generate a new hub and place it in the path: `myapp/internal/app/http/hubs/post`
+
+This creates a new hub at `myapp/internal/app/http/hubs/post.go`:
 
 ```go
 package hubs
 
 import (
-	"fmt"
-
-	"github.com/nicklasjeppesen/going_internal/super/channels"
-	socket "github.com/nicklasjeppesen/going_internal/super/socket"
+    "github.com/nicklasjeppesen/going_internal/super/channels"
+    socket "github.com/nicklasjeppesen/going_internal/super/socket"
 )
 
 type PostHub struct {
-	socket.BaseHub
+    socket.BaseHub
 }
 
-
-// Register the routes for the chat hub
+// Register event handlers
 func (post *PostHub) RegisterRoutes() {
-	post.On("sendMessage", post.handleNewMessage)
+    post.On("sendMessage", post.handleNewMessage)
 }
 
-
+// Handle incoming messages from clients
 func (post *PostHub) handleNewMessage(parameters []string, client *socket.Client) error {
-	
-    // handler for when reciving a message
-	return nil
+    // Handle the message
+    return nil
 }
 
-
-// handler when user is cancle a connection
+// Handle client disconnection
 func (post *PostHub) CancelConnection(client *socket.Client) {
 }
 
-// Handle message send from the app
-func (MessageHub *PostHub) AppReceiver(message channels.Socket) {
-    
-}
+// Handle messages sent from the application (controllers/jobs)
+func (post *PostHub) AppReceiver(message channels.Socket) {
 
-```
-This is example on how to hub will look like. 
-
-<a name="use-of-websocket"></a>
-## Use of websocket
-This section will exlain how to use going websocket, for the server side application
-
-<a name="register-a-new-websocket"></a>
-### Register a new websocket
-Go to the socket route file here: `myapp/internal/routes/socket.go`, and add register the URL and 
-
-```go 
-/*
-|--------------------------------------------------------------------------
-| Websocket routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register websocket routes for your application.
-*/
-func Socketrouter(socketRouter socket.Router) socket.Router {
-	socketRouter.MapHub("/ws/post", &hubs.PostHub{})
-	return socketRouter
 }
 ```
 
-<a name="add-middleware"></a>
-#### Add middleware
-You can also add optional middleare to your middleware request, like this: 
+### Event-based routing
 
-```go 
-/*
-|--------------------------------------------------------------------------
-| Websocket routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register websocket routes for your application.
-*/
-func Socketrouter(socketRouter socket.Router) socket.Router {
-	socketRouter.MapHub("/ws/post", &hubs.PostHub{}, ...middlewares)
-	return socketRouter
-}
-```
-
-### Get authenticate user 
-The client object contain the same Auth struct as in the Request struct in struct. 
-
-```go 
-func (post *PostHub) handleNewMessage(parameters []string, client *socket.Client) error {
-	
-    auth := client.Auth
-    // Futher actions with Auth. 
-	return nil
-}
-```
-
-### Storing clients
-There several options for storing clients that has been registers to your hub. 
-
-#### Hubs Storage
-When a clients get registers you can choose to storing this user in hubs array like this: 
+Use `On(event, callback)` to register event handlers. When a client sends a message with a specific action, the corresponding handler is called:
 
 ```go
-// Register a new client to this hubs
-func (message *MessageHub) RegisterUser(contents []string, client *socket.Client) error {
+func (post *PostHub) RegisterRoutes() {
+    post.On("sendMessage", post.handleNewMessage)
+    post.On("typing", post.handleTyping)
+    post.On("joinRoom", post.handleJoinRoom)
+}
+```
 
-	message.Clients[client.Auth.ID] = client
-	return nil
+
+## Registering a hub
+
+Go to the socket route file at `myapp/internal/routes/socket.go`:
+
+```go
+func Socketrouter(socketRouter socket.Router) socket.Router {
+    socketRouter.MapHub("/ws/post", &hubs.PostHub{})
+    return socketRouter
+}
+```
+
+
+## Middleware
+
+Add optional middleware to your WebSocket routes:
+
+```go
+func Socketrouter(socketRouter socket.Router) socket.Router {
+    socketRouter.MapHub("/ws/post", &hubs.PostHub{}, middleware.JWTMiddleware)
+    return socketRouter
+}
+```
+
+
+## Authenticated user
+
+The client object contains the same Auth struct as the Request struct:
+
+```go
+func (post *PostHub) handleNewMessage(parameters []string, client *socket.Client) error {
+    userId := client.Auth.ID
+    // Use userId...
+    return nil
+}
+```
+
+
+## Storing clients
+
+### Hub storage
+
+Store clients directly in the hub's `Clients` map:
+
+```go
+func (message *MessageHub) RegisterUser(contents []string, client *socket.Client) error {
+    message.Clients[client.Auth.ID] = client
+    return nil
 }
 
-// handler when user is cancle a connection
 func (post *PostHub) CancelConnection(client *socket.Client) {
-	delete(post.Clients, client.Auth.ID)
+    delete(post.Clients, client.Auth.ID)
 }
 ```
-#### Rooms 
-Going support the tradtional feature room for socket. where you can store a clients i a room, for later actions. 
 
-this 
+### Rooms
+
+Going supports rooms for grouping clients:
 
 ```go
-
 func (message *MessageHub) RegisterUser(contents []string, client *socket.Client) error {
+    // Create a room with a custom ID
+    room := message.Rooms.CreateRoomWithCustomUUID("messageRoom", "custom-id-123")
+    client.RoomID = "custom-id-123"
 
-	var customUUID = "43dfggg&dsGv5" // Random id
-    var roomName = "messageRoom"
-	newRoom := message.Rooms.CreateRoomWithCustomUUID(roomName, customUUID)
-	client.RoomID = customUUID
-    
-    var errors = message.Rooms.AddClientToRoom(client, newRoom.ID)
-	if errors != nil {
-		fmt.Println("Error adding client to room:", errors)
-        return errors
-	}
-	return nil
+    // Or create a room with a random UUID
+    // room := message.Rooms.CreateRoom("messageRoom")
+
+    err := message.Rooms.AddClientToRoom(client, room.ID)
+    if err != nil {
+        return err
+    }
+    return nil
 }
 ```
-You can also choose to get a random room id by run the following: 
+
+Room operations:
+- `CreateRoom(name)` - Create a room with a random UUID
+- `CreateRoomWithCustomUUID(name, uuid)` - Create a room with a specific ID
+- `Getroom(roomId)` - Get a room by ID
+- `AddClientToRoom(client, roomId)` - Add a client to a room
+- `RemoveClientFromRoom(client, room)` - Remove a client from a room
+- `RemoveClientFromRooms(client)` - Remove a client from all rooms
+
+
+## Receiving messages
+
+The first parameter is an array of strings containing all inputs the user sent. **Always check if the array is nil:**
+
 ```go
-newRoom := message.Rooms.CreateRoom(roomName)
-```
-
-### Get Message from incomming message
-The first input for a request, is an array of strings, contain a list of al the input the user added to the request. NOTE: the paramter array can be nil, so remember check if it null. 
-
-```go 
 func (post *PostHub) handleNewMessage(parameters []string, client *socket.Client) error {
-    input_one = parameters[0]
-    fmt.Println("Input from user is: ", input_one)
-    // Futher actions 
-	return nil
+    if len(parameters) == 0 {
+        return nil
+    }
+    input := parameters[0]
+    fmt.Println("Input from user:", input)
+    return nil
 }
 ```
 
-<a name="send-a-message-from-the-server-to-the-client"></a>
-##Send a message from the server to the client
 
-There is 2 way you can send a message, from the hub, or in your controller. 
+## Sending messages
 
-### Send a Message from the server to the client:
+### From hub to client
+
+Send a message to a specific client:
+
 ```go
-
- // Function to send a message to other user in a chat 
 func (messagehub *MessageHub) SendMessage(contents []string, client *socket.Client) error {
-
-        actionClientListenFor := "sendMessage"
-        messageToTheClient := "Hello from the server"
-        client.SendMessage(actionClientListenFor, messageToTheClient)	
-	return nil
+    client.SendMessage("newMessage", "Hello from the server")
+    return nil
 }
 ```
 
-### Send message to people in a room
+### To all clients in a room
 
-``` go 
-/*
- * Function to send a message to other user in a chat
- */
-func (messagehub *MessageHub) SendMessage(contents []string, client *socket.Client) error {
-
-	var user = new(db.Chat).DB(context.Background()).Where("id", chatId).WithUsers().First()
-	var message = new(db.Message).DB(context.Background()).Where("id", messageId).First()
-
-	for _, chatMember := range chat.Users().Items() {
-		if client, ok := messagehub.Clients[fmt.Sprint(chatMember.Id)]; ok {
-			client.SendMessage(SendMessage, message)
-		}
-	}
-
-	return nil
-}
-```
-You can also send a message to all clients in a room. 
-``` go 
+```go
 func (message *MessageHub) RegisterUser(contents []string, client *socket.Client) error {
-
-	clients := message.Rooms.Getroom("1").Clients
-	for _, _client := range clients {
-		_client.SendMessage("NewUser", client.GetId(), "input_two")
-	}
-	return nil
+    clients := message.Rooms.Getroom("1").Clients
+    for _, c := range clients {
+        c.SendMessage("newUser", client.GetId())
+    }
+    return nil
 }
 ```
-You can also send a message to client from your controllers in the app, as the following: 
-```go
 
+### To specific clients
+
+Iterate over stored clients and send to specific users:
+
+```go
+func (messagehub *MessageHub) SendMessage(contents []string, client *socket.Client) error {
+    chat := new(db.Chat).DB(context.Background()).Where("id", chatId).WithUsers().First()
+    message := new(db.Message).DB(context.Background()).Where("id", messageId).First()
+
+    for _, chatMember := range chat.Users().Items() {
+        if c, ok := messagehub.Clients[fmt.Sprint(chatMember.Id)]; ok {
+            c.SendMessage("newMessage", message)
+        }
+    }
+    return nil
+}
+```
+
+### From controller to hub
+
+Send a message from a controller to a hub using the channels package:
+
+```go
 package controller
 
 import "github.com/nicklasjeppesen/going_internal/super/channels"
@@ -246,36 +247,69 @@ func (c *PostController) SocketPost() Result {
 	return Response.Print("Just send a message to socket")
 }
 ```
-After this, it will be the function ```AppReceiver``` in your hub, that will handle this command.
 
-<a name="frontend"></a>
-## Frontend: 
-In going project you also receive a javascript file for handling websocket. you should include that into your page, here is an example on how to using it: 
+This triggers the `AppReceiver` method in your hub that handles the `/ws/post` URL.
 
-```javascript 
-<script> 
- const socket = new GOSocket("ws://" +  document.location.host + "/ws/post")
 
-    socket.onOpen(() => {
-        console.log("WebSocket connection opened");
-		 socket.invoke("RegisterUser");
-	})
+## App-to-socket messaging
 
-    socket.onClose(() => {
-        console.log("WebSocket connection Closed");
-    })
+The `channels` package provides a bridge between application code (controllers, jobs) and WebSocket hubs. When you call `channels.SendMessageToSocket()`, the message is sent through an internal channel and routed to the appropriate hub's `AppReceiver` method.
 
-    socket.on("sendMessage", function(message) {
-        console.log("Message from the server")
-        console.log(message)
-    })
+```go
+func (h *PostHub) AppReceiver(message channels.Socket) {
+    // message.URL contains the target URL
+    // message.Message contains the action name
+    // message.Data contains the payload
 
-    socket.start()
-
-    // Send message to the server
-    function callServer() {
-        socket.invoke("sendMessage", "input from browser")
+    // Broadcast to all clients connected to this hub
+    for _, client := range h.Clients {
+        client.SendMessage(message.Message, message.Data)
     }
-</script>
-
+}
 ```
+
+This is useful for sending real-time notifications from background jobs or controllers to connected WebSocket clients.
+
+
+## Frontend
+
+Going includes a JavaScript WebSocket client. Include it in your page:
+
+```javascript
+<script>
+const socket = new GOSocket("ws://" + document.location.host + "/ws/post")
+
+socket.onOpen(() => {
+    console.log("WebSocket connection opened");
+    socket.invoke("RegisterUser");
+})
+
+socket.onClose(() => {
+    console.log("WebSocket connection closed");
+})
+
+socket.on("sendMessage", function(message) {
+    console.log("Message from server:", message)
+})
+
+socket.on("newNotification", function(data) {
+    console.log("Notification:", data)
+})
+
+socket.start()
+
+// Send a message to the server
+function callServer() {
+    socket.invoke("sendMessage", "input from browser")
+}
+</script>
+```
+
+### JavaScript API
+
+- `new GOSocket(url)` - Create a new WebSocket connection
+- `socket.start()` - Open the connection
+- `socket.onOpen(callback)` - Called when connection opens
+- `socket.onClose(callback)` - Called when connection closes
+- `socket.on(event, callback)` - Listen for server events
+- `socket.invoke(action, ...args)` - Send a message to the server
