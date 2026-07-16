@@ -2,201 +2,242 @@
 
 - [Introduction](#introduction)
 - [Setup](#setup)
-- [Get request](#get-request)
+- [Querying](#querying)
+- [Create](#create)
+- [Update](#update)
+- [Delete](#delete)
+- [Where conditions](#where-conditions)
+- [Eager loading](#eager-loading)
+- [Transactions](#transactions)
+- [Select (raw queries)](#select-raw-queries)
+- [Pagination](#pagination)
 - [Add routes](#add-routes)
 
 
-
-<a name="introduction"></a>
 ## Introduction
 
-This section introduce how to use the the build in ORM for Going. 
-This is very much inspired on how other framework ORM work, and is created to 
-be a payoff between performance and developerment speed.  
+This section introduces how to use the built-in ORM for Going.
+The ORM is inspired by Laravel's Eloquent and provides an ActiveRecord pattern with a chainable query builder, supporting PostgreSQL and SQLite.
 
 
-<a name="setup"></a>
 ## Setup
-For creating a new ORM, you have to define a new struct. Its strongly recommended you add this struct to the path ```/app/models/db/```.The struct include the ActiveRecord struct, which is a take a generic type, that shall be the new ORM you create: 
 
-In the example: you start by defining the struct, every field kan be a column in the database. ActiveRecord has to take the type of a pointer to current struct. 
+To create a new ORM model, define a struct that embeds `ActiveRecord[*YourType]`. It is strongly recommended to place model files in `/app/models/db/`.
 
-In the DB function which is required, you defined a your ORM, with table name and Columns. 
+The struct includes the `ActiveRecord` generic type, which should be a pointer to the current struct. Every field represents a column in the database.
 
-```go 
+The `DB(ctx)` function is required - it initializes the ORM with table name, columns, and a database connection:
+
+```go
+import (
+    "context"
+    . "github.com/nicklasjeppesen/going_internal/super/db"
+)
+
 type User struct {
-	ActiveRecord[*User] `json:"-" swaggerignore:"true"`
-	Name                string `json:"name" validate:"required"`
-	Age                 int64  `json:"-" validate:"min=0,max=99"`
-	Email               string `json:"email" validate:"required"`
-	Password            string `json:"password" validate:"required" hidden:"true"`
-	SessionToken        string `json:"-" hidden:"true"`
-	Company_id          int64  `json:"Company_id" validate:"required"`
+    ActiveRecord[*User] `json:"-" swaggerignore:"true"`
+    Name                string `json:"name" validate:"required"`
+    Age                 int64  `json:"-" validate:"min=0,max=99"`
+    Email               string `json:"email" validate:"required"`
+    Password            string `json:"password" validate:"required" hidden:"true"`
+    SessionToken        string `json:"-" hidden:"true"`
+    Company_id          int64  `json:"Company_id" validate:"required"`
 }
 
-// Creating DB instance. 
-func (_user User) DB() *User {
-	user := &User{}
-	user.Table = "users"
-	user.Columns = user.Columns()
-	
-	// Creating DB
-	user.ParentDB = CreateORM(user)
-	return user
+// Creating DB instance
+func (_user User) DB(ctx context.Context) *User {
+    user := &User{}
+    user.Table = "users"
+    user.Columns = user.columns()
+
+    // Creating ORM with context
+    user.ParentDB = CreateORM(ctx, user)
+    return user
 }
 
 func (user *User) columns() Columns {
-	return Columns{
-		// Column		  "values"
-		"age":          &user.Age,
-		"name":         &user.Name,
-		"email":        &user.Email,
-		"password":     &user.Password,
-		"sessiontoken": &user.SessionToken,
-		"company_id":   &user.Company_id,
-	}
- }
+    return Columns{
+        // Column        "values"
+        "age":          &user.Age,
+        "name":         &user.Name,
+        "email":        &user.Email,
+        "password":     &user.Password,
+        "sessiontoken": &user.SessionToken,
+        "company_id":   &user.Company_id,
+    }
+}
+```
+
+### JSON and struct tags
+
+- `json:"-"` hides the field from JSON output.
+- `hidden:"true"` hides the field when the model is serialized to JSON via `ToJson()`.
+- `validate:"..."` tags are used by the validation system.
+
+
+## Querying
+
+Always call `DB(ctx)` before performing any database operations. The context follows Go's standard `context.Context` pattern.
+
+### Get all records
+```go
+users := User{}.DB(context.Background()).Get() // returns Collection[*User]
+```
+
+### Get first record
+```go
+user := User{}.DB(context.Background()).Where("id", 1).First() // returns *User
+```
+
+### With conditions
+```go
+users := User{}.DB(context.Background()).Where("age", 30).Get()
+```
+
+### WhereIn
+```go
+users := User{}.DB(context.Background()).WhereIn("id", []int64{1, 2, 3}).Get()
+```
+
+### Ordering
+```go
+users := User{}.DB(context.Background()).OrderBy("name").Get()
+users := User{}.DB(context.Background()).OrderByDesc("created_at").Get()
+```
+
+### Limit and Offset
+```go
+users := User{}.DB(context.Background()).Limit(10).OffSet(20).Get()
+```
+
+### Eager loading relationships
+```go
+user := User{}.DB(context.Background()).With("Company").First()
+fmt.Println(user.Company().Item()) // returns the related Company
+```
+
+### Pessimistic locking (PostgreSQL only)
+```go
+user := User{}.DB(context.Background()).Where("id", 1).LockForUpdate().First()
 ```
 
 
+## Create
 
-<a name="Get-request"></a>
-## Get request
-how to use The ORM:
-Its important to call the DB before starting adding info.  
-The DB take in the GO context, which has been a standard for GO DB. So bare so to addd a context the the DB. 
-```go 
-var users = User{}.DB(context.Background()).Get() // return all users. 
-```
-
-<a name="Get-request"></a>
-## Create/Update request
-how to use The ORM: 
-```go 
-var users = User{}.DB(context.Background()) 
-user.Name ="Nicklas" 
+```go
+user := new(User).DB(context.Background())
+user.Name = "Nicklas"
 user.Age = 30
 user.Email = "njep@Going.com"
-savedUser := user.Save() // stored id, created_at, updated_at in the new saveUser with more info
-
-savedUser.Age = 34 // im not 30 
-SavedUser.Update() // update the current instance. 
+savedUser, err := user.Save() // returns (*User, error) with auto-generated id, created_at, updated_at
 ```
 
 
+## Update
 
-
-
-<a name="addRoutes"></a>
-## Add Routes
-
-Either for API or for genereal request it can be usefull if the model can include what action can be exccuted for a given object. also known as Level 3 in Richardson Maturity model level 3: https://martinfowler.com/articles/richardsonMaturityModel.html#level3
-
-This can be done because Going ORM and routing is working together to include actions. Example: 
-
-in your router filer ex: `routes/web.go` you can have the following: 
+Fetch the record, change the values, and call `Update()`. The ORM uses the primary key for updating:
 
 ```go
-func Samplerouter() *web.MyRouter {
-
-	SampleRouter := web.NewMyRouter()
-	var sampleController = SampleController{}
-
-	SampleRouter.GET("/sample/index", sampleController.ShowUser).Name("sample.index")
-	SampleRouter.POST("/sample/store", sampleController.Store).Name("sample.store")
-	SampleRouter.GET("/sample/show/{id}", sampleController.ShowUser).Name("sample.ShowInput")
+user := User{}.DB(context.Background()).Where("id", 1).First()
+user.Age = 1000
+if err := user.Update(); err != nil {
+    // Handle error
 }
 ```
-This is your routes, in your controller, you can define your model like this: 
+
+
+## Delete
+
+Delete a record by fetching it first and calling `Delete()`:
 
 ```go
-type SampleController struct {
-	ControllerBase
-}
-
-func (c *SampleController) Get() Result {
-	user := models.User{}.DB().AddRoutes("sample").Get()
-	return Response.PrintJson(user)
-}
+user := User{}.DB(context.Background()).Where("id", 3).First()
+user.Delete()
 ```
-The way this is works is, Addroutes will do two things. firs step: in the function addRoutes you define a string called sample, it will look for all routes with the name starting the this prefix "sample". Thats how it get a list of routes. 
-Second, for each object it will replace the input {id} with a concret value. The way this is done is, it will check if if the model has this property id. (DB column) and then replace it. 
 
 
-### Foreign unknown key: 
-What if in your URL you have an foreign value, that is not part of the model?  
-in the addRoutes function has a optional input parameter, which is a ```map[string]string``` That is the type of key:id, value: foreignID, which will the same for all the objects. Which is usefull for URL that have a parent. example: 
+## Where conditions
+
+The ORM supports several query conditions:
 
 ```go
-func Samplerouter() *web.MyRouter {
+// Basic where
+.Where("column", value)
 
-	SampleRouter := web.NewMyRouter()
-	var sampleController = SampleController{}
+// WhereIn (for IN clauses)
+.WhereIn("column", []int64{1, 2, 3})
 
-	SampleRouter.GET("/sample/index", sampleController.ShowUser).Name("sample.index")
-	SampleRouter.POST("/sample/store", sampleController.Store).Name("sample.store")
-	SampleRouter.GET("/sample/show/{id}", sampleController.ShowUser).Name("sample.ShowInput")
+// Or condition
+.Or("column", value)
 
-    SampleRouter.GET("/sample/group/{groupId}/show/{id}", sampleController.ShowUser).Name("sample.ShowInput")
-}
+// Polymorphic where
+.WhereMorph("entryable", "User")
 ```
-This is your routes, in your controller, you can define your model like this: 
+
+
+## Eager loading
+
+Eager loading prevents N+1 query problems by loading related models in advance:
 
 ```go
-type SampleController struct {
-	ControllerBase
+// Load a single relation
+company := Company{}.DB(ctx).With("Users").First()
+for _, user := range company.Users().Items() {
+    fmt.Println(user.Name)
 }
 
-func (c *SampleController) Get() Result {
-	user := models.User{}.DB().AddRoutes(
-        "sample",
-         map[string]string{
-            "groupId" : "1"}).
-            Get()
-	return Response.PrintJson(user)
+// Load multiple relations
+user := User{}.DB(ctx).With("Company", "Posts").First()
+```
+
+See the [Relationships](relationships.md) section for details on defining relationships.
+
+
+## Transactions
+
+Wrap multiple operations in a transaction. If the function returns an error or panics, the transaction is rolled back:
+
+```go
+err := User{}.DB(ctx).Transaction(func(txUser *User) error {
+    txUser.Name = "Updated Name"
+    if _, err := txUser.Save(); err != nil {
+        return err
+    }
+    // more operations...
+    return nil
+})
+```
+
+You can also attach an existing transaction:
+
+```go
+txUser := user.WithTx(tx)
+```
+
+
+## Select (raw queries)
+
+For custom SQL queries, use `Select()` which returns `[]map[string]any`:
+
+```go
+results := User{}.DB(ctx).Select("SELECT * FROM users WHERE age > ?", 25)
+```
+
+
+## Pagination
+
+Pagination is built into the ORM. Call `Pagination()` with the HTTP request and the number of items per page:
+
+```go
+func (c *SampleController) Get(r request.Requestbase) {
+    users := db.User{}.DB(r.R.Context()).Pagination(r.R, 3)
+    Response.PrintJson(users)
 }
 ```
-Which will return the routes and replace the groupId with 1.
 
+Example response:
 
-
-## Update 
-The update is straight forward, just get the DB record, change the value, and call the update, the ORM will use the primary key for updating the record. See the example below: 
-
-```go 
-var user = db.User{}.DB(context.Background()).Where("id", 1).First()
-	user.Age = 1000
-	if err := user.Update(); err != nil {
-		// Handle error
-	}
-```
-
-## Delete a record
-Delete a record, is as easy as update One, get it, and call delete.
-```go 
-user := new(db.User).DB(context.Background()).Where("id", 3).First()
-	user.Delete()
-```
-
-
-## Select
-If you want to make a custom SQL query, you can choose to Create your struct, and set the DB, and call the Select function, and this will be a clean SQL query, with no assumtion about table, colums and so on. The only thing is that, it will know what DB to connect to. 
-
-## Pagination: 
-It really simple to use pagination in Going ORM, use call the Pagination function, with the number of element per page, and then Going will handle the rest. 
-
-```go 
-
-//url: /sample
-func (c *SampleController) Get(r Request) Result {
-
-	users := db.User{}.DB(r.R.Context()).Pagination(r.R, 3)
-	return Response.PrintJson(users)
-}
-```
-
-Example 
-```json 
+```json
 {
     "current_page": 1,
     "data": [
@@ -208,24 +249,6 @@ Example
             "pivots": null,
             "routes": null,
             "updated_at": "2026-06-18T19:28:32Z"
-        },
-        {
-            "created_at": "2026-06-14T16:41:07Z",
-            "email": "nanna@live.dk",
-            "id": 2,
-            "name": "Nanna",
-            "pivots": null,
-            "routes": null,
-            "updated_at": "2026-06-17T20:49:50Z"
-        },
-        {
-            "created_at": "2026-06-18T19:23:26Z",
-            "email": "mom@live.dkk",
-            "id": 4,
-            "name": "mom",
-            "pivots": null,
-            "routes": null,
-            "updated_at": "2026-06-18T19:23:26Z"
         }
     ],
     "first_page_url": "/sample?page=1",
@@ -235,3 +258,64 @@ Example
     "prev_page_url": ""
 }
 ```
+
+
+## Add routes
+
+The ORM integrates with the routing system to include HATEOAS-style action links in your API responses (Level 3 in the [Richardson Maturity Model](https://martinfowler.com/articles/richardsonMaturityModel.html#level3)).
+
+Define your named routes:
+
+```go
+func Samplerouter() *customrouter.MyRouter {
+    sampleRouter := customrouter.NewMyRouter()
+    var sampleController = SampleController{}
+
+    sampleRouter.GET("/sample/index", sampleController.ShowUser).Name("sample.index")
+    sampleRouter.POST("/sample/store", sampleController.Store).Name("sample.store")
+    sampleRouter.GET("/sample/show/{id}", sampleController.ShowUser).Name("sample.ShowInput")
+    return sampleRouter
+}
+```
+
+Then in your controller, use `AddRoutes()` with the route prefix:
+
+```go
+type SampleController struct {
+    customrouter.BaseController
+}
+
+func (c *SampleController) Get(r request.Requestbase) {
+    users := models.User{}.DB(r.R.Context()).AddRoutes("sample").Get()
+    response.NewResponse().PrintJson(users).ServeHTTP(r.W, r.R)
+}
+```
+
+`AddRoutes("sample")` finds all routes with names starting with "sample" and replaces `{id}` placeholders with each model's primary key.
+
+### Foreign key placeholders
+
+If your URL contains a foreign key that is not part of the model, pass a `map[string]string` to `AddRoutes`:
+
+```go
+func Samplerouter() *customrouter.MyRouter {
+    sampleRouter := customrouter.NewMyRouter()
+    var sampleController = SampleController{}
+
+    sampleRouter.GET("/sample/index", sampleController.ShowUser).Name("sample.index")
+    sampleRouter.GET("/sample/group/{groupId}/show/{id}", sampleController.ShowUser).Name("sample.ShowInput")
+    return sampleRouter
+}
+```
+
+```go
+func (c *SampleController) Get(r Request) {
+    users := models.User{}.DB(r.R.Context()).AddRoutes(
+        "sample",
+        map[string]string{"groupId": "1"},
+    ).Get()
+    Response.PrintJson(users)
+}
+```
+
+This will return routes with `groupId` replaced by "1" for all objects.
