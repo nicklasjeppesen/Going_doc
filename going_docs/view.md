@@ -1,4 +1,4 @@
-# Views 
+# Views
 
 - [Introduction](#introduction)
 - [Creating a view](#creating-a-view)
@@ -7,22 +7,30 @@
 - [View names convention](#view-names-convention)
 - [Components and sub views](#components-and-sub-views)
   - [Components](#components)
-- [Other Base view](#other-base-view)
-- [Build in view functions](#build-in-view-functions)
----
+- [Other base views](#other-base-views)
+- [Built-in view functions](#built-in-view-functions)
+  - [render](#render)
+  - [component](#component)
+  - [haserrors](#haserrors)
+  - [hasflash](#hasflash)
+  - [old](#old)
+  - [csrf_token](#csrf_token)
+  - [Add your own](#add-your-own)
 
-
-<a name="introduction"></a>
 ## Introduction
 
-this section describe how to use the view functionality in Going. Going is using Go's build in template, for simplicity, but have added custom functions, and other design choices, for productive and giving you some of the same options as in other popular web framework. 
+This section describes how to use the view functionality in Going. Going uses Go's built-in templates with custom functions and design choices for productive development, giving you options similar to other popular web frameworks.
 
-<a name="creating-a-view"></a>
+Going supports two view systems:
+- **Server-side templates** - Go's built-in `html/template` with custom functions
+- **Inertia.js** - SPA-like behavior with React/Vue frontends
+
+
 ## Creating a view
 
-All views should be place in the folder ressources/views. Views is a function available in your controller, defined in controller_base, which allow you to return a view as shown below. 
+All views should be placed in `resources/views/`. Views are returned from controllers using the `View()` function:
 
-```go 
+```go
 package controller
 
 type HomeController struct {
@@ -51,13 +59,16 @@ func (c *HomeController) Home() Result {
 }
 ```
 
+This renders the template file `resources/views/index.tmpl`.
 
-## Views structure 
-It assume all view, is starting the the base view place at ```resources/views/base.template```, 
 
-The when you return a view name in your controller class, Going will replace he ContentView with the name of the view, in the custom render function, and the actually view will get all view data. NOTE: the data parsing from the controller is also avaible here. 
+## Views structure
 
-```go 
+It is assumed all views start from the base view at `resources/views/base.template`.
+
+When you return a view name in your controller, Going replaces `ContentView` with the view name in the custom `render` function, and the view receives all view data:
+
+```go
 // resources/views/base.template
 
 {{ define "base" }}
@@ -67,7 +78,7 @@ The when you return a view name in your controller class, Going will replace he 
     <meta charset="UTF-8">
     <meta name="csrf_token" content="{{ .csrf_token }}">
     <title>{{ .Title }}</title>
-    </head>
+</head>
 <body>
     <main>
         {{ render .ContentView . }}
@@ -78,12 +89,14 @@ The when you return a view name in your controller class, Going will replace he 
 ```
 
 ### Partial views
-Sometimes you might want to define data in your view, and place it, at a given place in the baseView, like a specific footer, or header. This can easy be done with Going custom render func. here we have defined a footer section in the base template file
+
+Define sections in your view and place them at specific locations in the base view:
 
 ```go
+// resources/views/base.template
 {{ define "base" }}
 <!DOCTYPE html>
-<html lang="da">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="csrf_token" content="{{ .csrf_token }}">
@@ -92,7 +105,6 @@ Sometimes you might want to define data in your view, and place it, at a given p
     <script src="/assets/js/socket.js"></script> 
 </head>
 <body>
-    
     <main>
         {{ render .ContentView . }}        
     </main>
@@ -103,9 +115,9 @@ Sometimes you might want to define data in your view, and place it, at a given p
 </body>
 </html>
 {{ end }}
-
-It can den be used like this: 
 ```
+
+Then define the partial in your view:
 
 ```go 
 {{ define "index" }}
@@ -128,12 +140,10 @@ It can den be used like this:
 {{ end }}
 ```
 
-OBS: you should name your partial in the naming convention: 'ContentView_section', to avoid colissions. 
+**Note**: Name your partials using the convention `ContentView_section` to avoid collisions.
 
 
 ## View names convention
-View shall be name after their path and filename. 
-In our example, index is at the top level in views, but you might want to group views in folders. This can be done as follow: 
 
 In the controller you define a path to your view by dot notation. This login will return the view in folder resources/views/auth/login.template
  
@@ -165,65 +175,54 @@ In your login view, you should define your view, acording to the path to the fil
 {{ end }}
 ```
 
-## Components and sub views 
-Going build on functions help to write you view onces, and apply components based deveopment, as you know from ex. from react. 
+## Components and sub views
 
-### Components 
-You can simple create a new template file, han use it as a component, ex. 
+Going provides functions for writing reusable view components, similar to React components.
 
-```go 
+### Components
+
+Create a template file as a component:
+
+```go
 // resources/views/shared/input.template
 {{ define "shared.input" }}
-
     <label for="id_{{.Name}}">{{.Title}}</label>
-    <input 
-        type="{{or (index . "Type") "text"}}" 
-        id="id_{{.Name}}" 
-        name="{{.Name}}" 
-        value="{{ if index . "oldValue" }} {{.oldValue}} {{ end }}" 
+    <input
+        type="{{or (index . "Type") "text"}}"
+        id="id_{{.Name}}"
+        name="{{.Name}}"
+        value="{{ if index . "oldValue" }} {{.oldValue}} {{ end }}"
         required
     >
-{{end}}
+{{ end }}
 ```
 
-Simple example of a form section with label and input, This can be used as follow: 
+Use the component in your views:
 
-```go 
-    <form enctype="multipart/form-data" action="/login" method="POST">
-        {{component "shared.input" "Title" "Email" "Name" "email" "oldValue" ( old "email" .) }}
-        {{component "shared.input" "Title" "Password" "Name" "password" "Type" "password" }}
-        {{csrf_token .}}
-        <button type="submit">Log ind</button>
-    </form>
+```go
+<form enctype="multipart/form-data" action="/login" method="POST">
+    {{component "shared.input" "Title" "Email" "Name" "email" "oldValue" ( old "email" .) }}
+    {{component "shared.input" "Title" "Password" "Name" "password" "Type" "password" }}
+    {{csrf_token .}}
+    <button type="submit">Log in</button>
+</form>
 ```
 
-Going build in component function first input is the name of the define component, and the a list of parameters in the form of key, value,... 
+The `component` function takes the component name followed by key-value pairs as parameters.
 
-## Other Base view 
-you dont need to use the base view, provided, you can switch between or not choose any if needed, which can be usefull for for only returning rendered subview from the server. 
 
-Go to controller_base.go 
+## Other base views
 
-```go 
+You don't need to use the default base view. You can switch between or omit base views:
+
+```go
+// Default view with base template
 var View = template.TemplateView{BaseView: "base", CustomViewFunctions: viewProvider.GetCustomViewFunction}.View
-```
-Here you can see the basis View varible, with the base view. You can choose to change the path for this like this: 
 
-```go 
-var View = template.TemplateView{BaseView: "bases.base", CustomViewFunctions: viewProvider.GetCustomViewFunction}.View
-```
-so the base is located at: ```resources/views/bases/base.go```or 
-you can define new onces like this: 
-
-```go 
-
-// General view
-var View = template.TemplateView{BaseView: "bases.base", CustomViewFunctions: viewProvider.GetCustomViewFunction}.View
-
-// Subview, does not return any baseView
+// SubView - no base template, just the content
 var SubView = template.TemplateView{BaseView: "", CustomViewFunctions: viewProvider.GetCustomViewFunction}.View
 
-// return a new view where the base is admin.go
+// Admin view with admin base template
 var AdminView = template.TemplateView{BaseView: "admin", CustomViewFunctions: viewProvider.GetCustomViewFunction}.View
 ```
 
@@ -232,42 +231,38 @@ var AdminView = template.TemplateView{BaseView: "admin", CustomViewFunctions: vi
 ### component 
 Is another build in function, that was described earlier
 
-### render 
-Render is a function that take a template name and data, and execute the template and return html page. it primary used for render main view, in the base view, but can be used to create custom sections, like title, footer and others, like this: 
+### render
 
+Renders a named template with data. Primarily used in the base view to render the main content and partials:
 
-Base view: 
 ```go
-    <footer>
-     {{ render (print .ContentView "_footer") . }}
-    </footer>     
+{{ render .ContentView . }}
+{{ render (print .ContentView "_footer") . }}
 ```
 
-now, you can in another view define this value: 
-auth/login.tmpl 
-```go 
-{{ define "auth.login_footer" }}
-    <h5>footer {{ .Title }}</h5>
+### component
+
+Renders a reusable template component with key-value parameters:
+
+```go
+{{component "shared.input" "Title" "Email" "Name" "email"}}
+```
+
+### haserrors
+
+A boolean indicating whether there are any validation errors:
+
+```go
+{{ if .haserrors }}
+    <div class="mb-4 text-red-600">
+        <p>An error occurred</p>
+    </div>
 {{ end }}
 ```
 
+Get specific error messages:
 
-### haserrors
-every view is render with a boolean, describe if there was and any error. 
-which is determine by, the error map contain any information. 
-This is how this can be used. 
-```go 
- {{ if .haserrors }}
-            <div class="mb-4 text-red-600">
-                <p>Error under try to login</p>
-            </div>
-            {{ end }}
-```
-
-#### Get the error message: 
-To get the error message, you can check the value like this. 
-
-```go 
+```go
 {{ if index .errors "email" }}
     <div class="text-red-500 mt-1 text-sm">
         {{ .errors.email }}
@@ -275,43 +270,46 @@ To get the error message, you can check the value like this.
 {{ end }}
 ```
 
-### hasflash 
-The view also include the hasflash method, which is true, if you parse data with in the response.With function. The data can be showet like this: 
+### hasflash
 
-```go 
+True if flash data was passed via `response.With()`:
+
+```go
 {{ if .hasflash }}
-   {{ range $key, $value := .flash }}
-        <h1>{{ $value}} </h1>
-    {{end }}
-{{end}}
+    {{ range $key, $value := .flash }}
+        <h1>{{ $value }}</h1>
+    {{ end }}
+{{ end }}
 ```
 
-
 ### old
-Old return the value that was post to your controller, ex. if user create post, that contain information, that information can be display like this.  
-``` go 
- <input
+
+Returns the value that was posted to your controller, useful for repopulating forms:
+
+```go
+<input
     type="email"
-    id="email"
     name="email"
-    placeholder="Enter your email"
-    class="flex h-10 w-full rounded-md border border-input px-3 py-2 text-base placeholder:text-gray-400 focus:outline-green-600 md:text-sm pl-10"
-    required
-    value="{{ old "email" .}}"
+    value="{{ old "email" . }}"
 />
 ```
 
-### csrf token
-For safety, the view provide a csrf function, that he middleware check to see, if a user can execute a given request. 
+### csrf_token
 
+Renders a hidden CSRF token input field:
 
-```go 
- <input type="hidden" name="csrf_token" value="{{ .csrf_token }}" />
+```go
+<input type="hidden" name="csrf_token" value="{{ .csrf_token }}" />
 ```
 
-### Add your own 
+### Add your own
 
-You can add your own build on view functions, that the framework wil register. 
+Add custom view functions in `myapp/internal/app/providers/view`:
 
-Go to ``` myapp/internal/app/providers/view ```
-There you can add a new entry to the map, the map structure is key: func name, value: func with input. 
+```go
+var CustomViewFunctions = map[string]any{
+    "uppercase": func(s string) string {
+        return strings.ToUpper(s),
+    },
+}
+```

@@ -1,329 +1,332 @@
 # ORM - Database Relationships
 
 - [Introduction](#introduction)
-- [Setup](#Setup)
 - [BelongsTo](#belongsto)
 - [HasOne](#hasone)
 - [HasMany](#hasmany)
-- [Belongs to many](#belongs-to-many)
+- [BelongsToMany](#belongstomany)
 - [BelongsToMorph](#belongstomorph)
+- [HasManyMorph](#hasmanymorph)
+- [Query modifiers](#query-modifiers)
 
 
 ## Introduction
-Going Activerecord a set of options for creating relationsship between your objects. Classic relationships you would know. 
+
+Going ActiveRecord provides a set of relationship types for creating associations between your models. The relationship methods are defined on your model structs and use the `CallerMethodName()` convention to automatically determine the relationship key.
 
 
-## Belongsto 
-A belongsto association sets up a relationship with another model, such that each instance of the declaring model "belongs to" one instance of the other model. For example, if your application includes company and users, and each user can be assigned to exactly one company, you'd declare the user model this way:
+## BelongsTo
 
-```go 
+A belongs-to association sets up a relationship where each instance of the declaring model "belongs to" one instance of the other model. For example, if each user belongs to one company:
+
+```go
 type User struct {
-	ActiveRecord[*User] `json:"-" swaggerignore:"true" validate:"-"`
-	Name                string `json:"name" validate:"required"`
-	Age                 int64  `json:"age" validate:"min=0,max=99"`
-	Email               string `json:"email" validate:"required"`
-	Password            string `json:"password" validate:"required" hidden:"true"`
-	SessionToken        string `json:"-" hidden:"true"`
-	Company_id          int64  // foreign Id
+    ActiveRecord[*User] `json:"-" swaggerignore:"true" validate:"-"`
+    Name                string `json:"name" validate:"required"`
+    Age                 int64  `json:"age" validate:"min=0,max=99"`
+    Email               string `json:"email" validate:"required"`
+    Password            string `json:"password" validate:"required" hidden:"true"`
+    SessionToken        string `json:"-" hidden:"true"`
+    Company_id          int64  // foreign key
 }
 
 func (user *User) columns() Columns {
-	return Columns{
-		// Column		  "values"
-		"age":          &user.Age,
-		"name":         &user.Name,
-		"email":        &user.Email,
-		"password":     &user.Password,
-		"sessiontoken": &user.SessionToken,
-		"company_id":   &user.Company_id,
-	}
+    return Columns{
+        "age":          &user.Age,
+        "name":         &user.Name,
+        "email":        &user.Email,
+        "password":     &user.Password,
+        "sessiontoken": &user.SessionToken,
+        "company_id":   &user.Company_id,
+    }
 }
-// set up the relationship
+
+// Set up the relationship
 func (user *User) Company() BelongsTo[*Company] {
-	return NewBelongsTo(new(Company).DB(user.GetCtx()), user)
+    return NewBelongsTo(new(Company).DB(user.GetCtx()), user)
 }
 ```
 
-how to use this? 
+### Usage
 
-```go 
+```go
 user := new(db.User).DB(context.Background()).With("Company").First()
-	fmt.Println(user.Company().Item()) // return Company struct
+fmt.Println(user.Company().Item()) // returns Company struct
 ```
 
-### Details
-The magic is, here is, you create a new function Called Company, and in then add your current user and company. Going will assume you follow a given convention for naming your foreign_id DB column. Going will call company.GetName() function and add _id at the end, for looking for the id in user struct, and then get the company struct. 
+### Convention
+
+Going calls `GetName()` on the related model and appends `_id` to find the foreign key column. For `Company()`, it looks for `Company_id` in the User struct.
 
 
 ## HasOne
-A hasOne association indicates that one other model has a reference to this model. That model can be fetched through this association.
 
-For example, if each company in your application has only one user, you'd declare the company model like this:
+A has-one association indicates that one other model has a reference to this model. For example, if each company has one user:
 
-```go 
+```go
 type Company struct {
-	ActiveRecord[*Company] `json:"-" swaggerignore:"true" validate:"-"`
-	Name                   string `json:"name" validate:"required"`
+    ActiveRecord[*Company] `json:"-" swaggerignore:"true" validate:"-"`
+    Name                   string `json:"name" validate:"required"`
 }
-// DB & columns func
 
 func (c *Company) User() HasOne[*User] {
-	return NewHasOne(new(User).DB(c.GetCtx()), c)
+    return NewHasOne(new(User).DB(c.GetCtx()), c)
 }
 ```
 
-### how to use it: 
+### Usage
 
-``` go
-company := new(db.Company).DB(context.Background()).With("User").First()
-fmt.Println(company.User().Item()) // return user struct
-```
-
-You can also define a helper function, to avoid string conflict, like this: 
-```GO 
-func (c *Company) WithUser() *Company {
-	return c.With("User")
-}
-```
-Use:
 ```go
-company := new(db.Company).DB(context.Background()).WithUser().First()
-fmt.Println(company.User().Item()) // return user struct 
+company := new(db.Company).DB(context.Background()).With("User").First()
+fmt.Println(company.User().Item()) // returns User struct
 ```
 
+### Helper function
 
-### Details 
-Going asumme a given naming convention as before, for making this so simple. 
-When you define "User" in which, it asumme you include the exact name of the User function. Going will call the Company.GetName() function, and add _id, and look up in the user table for a column where this columns is equal company.PrimaryId. 
+Define a helper to avoid string conflicts with the `With()` method:
+
+```go
+func (c *Company) WithUser() *Company {
+    return c.With("User")
+}
+
+// Usage
+company := new(db.Company).DB(context.Background()).WithUser().First()
+fmt.Println(company.User().Item())
+```
+
+### Convention
+
+Going calls `GetName()` on the parent model and appends `_id` to look up the foreign key in the related table. For `User()` on Company, it looks for `Company_id` in the users table.
+
 
 ## HasMany
-Has Many, is similar to hasOne, just that, Going asumme there exists either 0 more many users that belongs to a company. you can reuse the user struct, from the example belongsTo, and chage the company struct, to use a HasMany object. 
 
+Has-many is similar to has-one, but assumes zero or more related records. Reuse the User struct from the belongs-to example and change the Company struct:
 
-```go 
+```go
 type Company struct {
-	ActiveRecord[*Company] `json:"-" swaggerignore:"true" validate:"-"`
-	Name                   string `json:"name" validate:"required"`
+    ActiveRecord[*Company] `json:"-" swaggerignore:"true" validate:"-"`
+    Name                   string `json:"name" validate:"required"`
 }
-// DB & columns func
 
-func (c *Company) User() HasMany[*User] {
-	return NewHasMany(new(User).DB(c.GetCtx()), c)
+func (c *Company) Users() HasMany[*User] {
+    return NewHasMany(new(User).DB(c.GetCtx()), c)
 }
 ```
-How to use it
-```go 
-company := new(db.Company).DB(context.Background()).WithUser().First()
-	for _, user := range company.User().Items() {
-		fmt.Println(user.ToJson()) // print the user struct in a json format
-	}
+
+### Usage
+
+```go
+company := new(db.Company).DB(context.Background()).WithUsers().First()
+for _, user := range company.Users().Items() {
+    fmt.Println(user.ToJson())
+}
+```
+
+You can also define a helper:
+
+```go
+func (c *Company) WithUsers() *Company {
+    return c.With("Users")
+}
 ```
 
 
 ## Belongs to many
 association creates a direct many-to-many relationship with another model, with no intervening model. This association indicates that each instance of the declaring model refers to zero or more instances of another model.
 
-You can implement many-to-many like this: 
-```go 
+```go
 func (c *Company) Users() BelongsToMany[*User] {
-	return NewBelongsToMany(new(User).DB(c.GetCtx()), c)
+    return NewBelongsToMany(new(User).DB(c.GetCtx()), c)
 }
 
 func (c *Company) WithUsers() *Company {
-	return c.With("Users")
+    return c.With("Users")
 }
 ```
 
-And use it like this: 
+### Usage
 
-```go 
+```go
 company := new(db.Company).DB(context.Background()).WithUsers().First()
-	for _, user := range company.Users().Items() {
-		fmt.Println(user.Name)
-	}
-```
-
-The DB is expected to have the the following table: "company_user", with the columns: 
-* company_id
-* user_id
-
-
-### Pivots columns 
-It is possible to include extra column to the pivot table, ex. active column. It can be included like the following: s
-
-```go 
-func (c *Company) Users() BelongsToMany[*User] {
-	return NewBelongsToMany(new(User).DB(c.GetCtx()), c).PivotCols("active")
+for _, user := range company.Users().Items() {
+    fmt.Println(user.Name)
 }
 ```
 
-```go 
-	company := new(db.Company).DB(context.Background()).WithUsers().First()
-	for _, user := range company.Users().Items() {
-		fmt.Println(user.Name)
-		fmt.Println(user.Pivots["active"]) // print the active columns 
-	}
+### Pivot table convention
+
+The pivot table is named alphabetically by combining both model names: `company_user`, with columns `company_id` and `user_id`. You can customize the name with `PivotTableName()`.
+
+### Pivot columns
+
+Include extra columns from the pivot table:
+
+```go
+func (c *Company) Users() BelongsToMany[*User] {
+    return NewBelongsToMany(new(User).DB(c.GetCtx()), c).PivotCols("active")
+}
 ```
 
+Access pivot data:
 
+```go
+company := new(db.Company).DB(context.Background()).WithUsers().First()
+for _, user := range company.Users().Items() {
+    fmt.Println(user.Name)
+    fmt.Println(user.Pivots["active"]) // pivot column value
+}
+```
+
+### Pivot operations
+
+```go
+// Attach a new record to the pivot
+relation.Attach(userId)
+
+// Detach a record from the pivot
+relation.Detach(userId)
+
+// Update an existing pivot record
+relation.UpdateExistingPivot(userId, map[string]any{"active": false})
+
+// Filter by pivot columns
+relation.WherePivot("active", true)
+
+// Order by pivot columns
+relation.OrderByPivot("created_at")
+```
 
 
 ## BelongsToMorph
 
-Why is this usefull? 
-How do you in a nice way parse functionality to other types? Or how do avoid of using Single Table Inheritance (STI)? 
-STI is a table, which hold multiple information about different models in a single database. An. If you have a Case System, and want to see what action that have been one that system? you could include a STI, but that Table will have many rows and have many information, maybe even empty columns. Therefore this solution which is strongly inspired from Rails Delegates Relation implemented. 
+Polymorphic associations (inspired by Rails delegates) allow a model to belong to different types. Instead of single table inheritance (STI), you use a type column and an ID column to reference different models.
 
-### The idea: 
-The idea is simple. You have an entry table, that has the the information: id, Entryable_id, entryable_type.., Created_at, Updated_at... Other optional columns. entryable type define the name of the foreign model, like user or company. and the entryable_id is the foreign key in that table. Now, you can retrive information from from both User and company and order in when they where created, which was impossible previously if they live in their own tables.   
+### The idea
 
-### Example of implementation
+An `Entry` table has `entryable_type` (the model name) and `entryable_id` (the foreign key). This lets you retrieve entries from different models (User, Company, etc.) ordered by creation time.
 
+### Implementation
 
-```go 
-/*
-//
-// BelongsToMorph relation: a model can belong to more models
-//This works by having the model to have two column, a type an id column for defining the model of of owner and foreign id.
-*/
+Define an interface for all delegatable models:
 
-//- Example of used:
-// Its recommendated to define an interface that include Ire
-// The interface to be implemented by models that can be entryable
+```go
+type IEntry interface {
+    types.IRepository // Required
 
-	type IEntry interface {
-		IRepository // Required interface to creating the interface.
-		
-        //
-		// Abstract function
-		// need to implemnt delegatable models
-		Title() string
+    // Abstract methods that each model must implement
+    Title() string
 
-        // 
-        // Not abtract 
-        // Implemented in the entryable 
-        // Can be override in some children structs
-		PrintHi() string
-	}
+    // Optional - can be overridden
+    PrintHi() string
+}
 
-	//The struct that can be Implemented into the struct in models to make them delegatable entries
-	type EntryAble struct {
-	}
+// Base struct that models embed to become delegatable
+type EntryAble struct{}
 
-	func (e *EntryAble) PrintHi() string {
-		return "Hi from EntryAble"
-	}
-
-//* ----- The DB MODEL ----------------------------------------------- //
-
-	type Entry struct {
-		ActiveRecord[*Entry] //int, created_at, updated_at
-		Name                 string
-		EntryAble_type       string
-		EntryAble_id         int64
-		EntryAble            IEntry // Value holder
-	}
-
-    // name of the type in the table
-	const delegate = "entryable"
-	
-    // Models that implement this type  
-    var (
-		entryAbles = []IEntry{
-			new(Company).DB(context.Background()),
-			new(User).DB(context.Background()).With("company"),
-		}
-	)
-
-    // Basis setup for a Entry model
-	func (e Entry) DB() *Entry {
-		entry := &Entry{}
-		entry.Table = "entries"
-		entry.Columns = Columns{
-			"name":             &entry.Name,
-			delegate + "_id":   &entry.EntryAble_id,
-			delegate + "_type": &entry.EntryAble_type,
-		}
-		entry.ParentDB = CreateORM(entry)
-		return entry
-	}
-
-	// * ------------------Relations --------------------------------//
-	func (e *Entry) Entryable() BelongsToMorph[IEntry] {
-		return NewBelongsToMorph(entryAbles, e)
-	}
-
-	//* ----------- Scopes ----------------------------------------//
-	func (e *Entry) Company() IDB[*Entry] {
-		return e.WhereMorph(delegate, new(Company).DB().GetName())
-	}
-	func (e *Entry) User() IDB[*Entry] {
-		return e.WhereMorph(delegate, new(User).DB().GetName())
-	}
-	
-
-    // 
-    // The Company struct
-    type Company struct {
-		ActiveRecord[*Company]
-		Name  string
-
-		// DelegateAbles
-		EntryAble // include the EntryAble struct to make company delegatable
-	}
-
-	func (c Company) DB() *Company {
-
-		company := &Company{}
-		company.Table = "companies"
-		company.Columns = Columns{
-			// Column		  "values"
-			"name": &company.Name,
-		}
-		company.ParentDB = CreateORM(company)
-		return company
-	}
-
-	// -------------- EntryAble functions --------------------//
-
-	//* Implement the abstract method
-	func (company *Company) Title() string {
-		return company.Name + ", Company Title is called"
-	}
-	//* Optional: override the PritHi function
-	func (company *Company) PrintHi() string {
-		return company.EntryAble.PrintHi() + " with added logic to it from Company"
-	}
-
-    // The user struct Will be needed to Implement the Title function too, but Printhi is optional and can be overridden.
-
-
-	//* -------------- Usage ----------------------------//
-	var entries = models.Entry{}.DB().With("Entryable").OrderByDesc("id").Company().Get()
-	for _, entry := range entries {
-		fmt.Println(entry.EntryAble.Title())
-		fmt.Println(entry.EntryAble.PrintHi())
-	}
+func (e *EntryAble) PrintHi() string {
+    return "Hi from EntryAble"
+}
 ```
-Note, when we are calling get, We are also calling the Func Company(), which is kind of a scope, so 
-we know, we will only get entries of type: Company, but that optional. 
-It can be little tricky to understand, but When you need this pattern, it a life saving, and you gonna love it.
 
-### DB Schema: 
-Just to help with the DB schema the entryable schema, even it should be clear to see:
-OBS: This is schema for SQLite DB
-The model, will automatic add able to the end, and assume that
+Define the Entry model:
+
+```go
+type Entry struct {
+    ActiveRecord[*Entry]
+    Name               string
+    EntryAble_type     string
+    EntryAble_id       int64
+    EntryAble          IEntry // value holder
+}
+
+const delegate = "entryable"
+
+// Register all models that can be entryable
+var entryAbles = []IEntry{
+    new(Company).DB(context.Background()),
+    new(User).DB(context.Background()).With("Company"),
+}
+
+func (e Entry) DB(ctx context.Context) *Entry {
+    entry := &Entry{}
+    entry.Table = "entries"
+    entry.Columns = Columns{
+        "name":             &entry.Name,
+        delegate + "_id":   &entry.EntryAble_id,
+        delegate + "_type": &entry.EntryAble_type,
+    }
+    entry.ParentDB = CreateORM(ctx, entry)
+    return entry
+}
+
+// Set up the relationship
+func (e *Entry) Entryable() BelongsToMorphRelation[IEntry] {
+    return NewBelongsToMorph(entryAbles, e)
+}
+
+// Scopes for filtering by type
+func (e *Entry) Company() types.IDB[*Entry] {
+    return e.WhereMorph(delegate, new(Company).DB(e.GetCtx()).GetName())
+}
+
+func (e *Entry) User() types.IDB[*Entry] {
+    return e.WhereMorph(delegate, new(User).DB(e.GetCtx()).GetName())
+}
+```
+
+Models implement the interface:
+
+```go
+type Company struct {
+    ActiveRecord[*Company]
+    Name    string
+    EntryAble // embed to become delegatable
+}
+
+func (c Company) DB(ctx context.Context) *Company {
+    company := &Company{}
+    company.Table = "companies"
+    company.Columns = Columns{
+        "name": &company.Name,
+    }
+    company.ParentDB = CreateORM(ctx, company)
+    return company
+}
+
+// Implement the abstract method
+func (company *Company) Title() string {
+    return company.Name + ", Company Title is called"
+}
+
+// Override the default method
+func (company *Company) PrintHi() string {
+    return company.EntryAble.PrintHi() + " with added logic from Company"
+}
+```
+
+### Usage
+
+```go
+entries := models.Entry{}.DB(context.Background()).With("Entryable").OrderByDesc("id").Company().Get()
+for _, entry := range entries {
+    fmt.Println(entry.EntryAble.Title())
+    fmt.Println(entry.EntryAble.PrintHi())
+}
+```
+
+### DB Schema (SQLite)
 
 ```sql
 CREATE TABLE IF NOT EXISTS entries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT,
-    entryable_type TEXT NOT NULL, 
+    entryable_type TEXT NOT NULL,
     entryable_id INTEGER NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
 
 CREATE TRIGGER IF NOT EXISTS update_entries_updated_at
 AFTER UPDATE ON entries
@@ -332,5 +335,41 @@ BEGIN
     UPDATE entries
     SET updated_at = CURRENT_TIMESTAMP
     WHERE id = OLD.id;
-END; 
+END;
 ```
+
+
+## HasManyMorph
+
+The inverse of BelongsToMorph - a model has many polymorphic entries:
+
+```go
+func (u *User) Entries() HasManyMorphRelation[*Entry] {
+    return NewHasManyMorph(entryAbles, u)
+}
+```
+
+### Usage
+
+```go
+user := new(db.User).DB(context.Background()).With("Entries").First()
+for _, entry := range user.Entries().Items() {
+    fmt.Println(entry.Name)
+}
+```
+
+
+## Query modifiers
+
+HasMany and BelongsToMany relationships support query modifiers for filtering, sorting, and limiting the related records:
+
+```go
+// Add where conditions to a relationship query
+func (c *Company) ActiveUsers() HasMany[*User] {
+    return NewHasMany(new(User).DB(c.GetCtx()), c).
+        Where("active", true).
+        OrderBy("name")
+}
+```
+
+Modifiers are applied when the relationship is loaded via eager loading (`With()`).
