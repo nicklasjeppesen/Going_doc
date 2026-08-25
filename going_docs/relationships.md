@@ -4,7 +4,7 @@
 - [BelongsTo](#belongsto)
 - [HasOne](#hasone)
 - [HasMany](#hasmany)
-- [BelongsToMany](#belongstomany)
+- [BelongsToMany](#belongs-to-many)
 - [BelongsToMorph](#belongstomorph)
 - [HasManyMorph](#hasmanymorph)
 - [Query modifiers](#query-modifiers)
