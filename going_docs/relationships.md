@@ -43,7 +43,7 @@ func (user *User) columns() Columns {
 
 // Set up the relationship
 func (user *User) Company() BelongsTo[*Company] {
-    return NewBelongsTo(new(Company).DB(user.GetCtx()), user)
+    return user.BelongsTo(new(Company).DB(user.GetCtx()))
 }
 ```
 
@@ -70,7 +70,7 @@ type Company struct {
 }
 
 func (c *Company) User() HasOne[*User] {
-    return NewHasOne(new(User).DB(c.GetCtx()), c)
+    return c.HasOne(new(User).DB(c.GetCtx()))
 }
 ```
 
@@ -111,7 +111,7 @@ type Company struct {
 }
 
 func (c *Company) Users() HasMany[*User] {
-    return NewHasMany(new(User).DB(c.GetCtx()), c)
+    return c.HasMany(new(User).DB(c.GetCtx()))
 }
 ```
 
@@ -138,7 +138,7 @@ association creates a direct many-to-many relationship with another model, with 
 
 ```go
 func (c *Company) Users() BelongsToMany[*User] {
-    return NewBelongsToMany(new(User).DB(c.GetCtx()), c)
+    return c.BelongsToMany(new(User).DB(c.GetCtx()))
 }
 
 func (c *Company) WithUsers() *Company {
@@ -263,7 +263,7 @@ func (e Entry) DB(ctx context.Context) *Entry {
 
 // Set up the relationship
 func (e *Entry) Entryable() BelongsToMorphRelation[IEntry] {
-    return NewBelongsToMorph(entryAbles, e)
+    return e.BelongsToMorph(entryAbles, delegate)
 }
 
 // Scopes for filtering by type
@@ -311,8 +311,8 @@ func (company *Company) PrintHi() string {
 ```go
 entries := models.Entry{}.DB(context.Background()).With("Entryable").OrderByDesc("id").Company().Get()
 for _, entry := range entries {
-    fmt.Println(entry.EntryAble.Title())
-    fmt.Println(entry.EntryAble.PrintHi())
+    fmt.Println(entry.Entryable().Item().Title()) // optional cast it to company struct
+    fmt.Println(entry.Entryable().Item().PrintHi())
 }
 ```
 
