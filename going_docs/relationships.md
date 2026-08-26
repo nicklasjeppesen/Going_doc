@@ -344,8 +344,8 @@ END;
 The inverse of BelongsToMorph - a model has many polymorphic entries:
 
 ```go
-func (u *User) Entries() HasManyMorphRelation[*Entry] {
-    return NewHasManyMorph(entryAbles, u)
+func (u *User) Entries() HasManyMorph[*Entry] {
+	return u.HasManyMorph(Entry{}.DB(u.GetCtx()))
 }
 ```
 
