@@ -7,6 +7,7 @@
 - [BelongsToMany](#belongs-to-many)
 - [BelongsToMorph](#belongstomorph)
 - [HasManyMorph](#hasmanymorph)
+- [Saving related records](#saving-related-records)
 - [Query modifiers](#query-modifiers)
 
 
@@ -357,6 +358,40 @@ for _, entry := range user.Entries().Items() {
     fmt.Println(entry.Name)
 }
 ```
+
+
+## Saving related records
+
+`HasMany`, `HasOne` and `HasManyMorph` can save a new child for a parent. The relation sets the child's foreign key from the parent, so you only fill in the child's own fields:
+
+```go
+company := new(db.Company).DB(ctx).Where("id", 2).First()
+
+user := new(db.User).DB(ctx)
+user.Name = "Nicklas"
+
+company.Users().Save(user)   // HasMany: users.company_id = 2
+company.Users().Attach(user) // the same as Save
+company.User().Save(user)    // HasOne: users.company_id = 2
+```
+
+For `HasManyMorph`, both `<name>able_id` and `<name>able_type` are set, the same columns `With()` reads:
+
+```go
+user := new(db.User).DB(ctx).Where("id", 2).First()
+
+entry := new(db.Entry).DB(ctx)
+entry.Name = "First entry"
+user.Entries().Save(entry) // entryable_id = 2, entryable_type = "user"
+```
+
+Things to know:
+
+- The parent must be saved (have an id). Otherwise `Save`/`Attach` returns an error and nothing is written.
+- The value comes from the parent's local key, `id` by default. With `LocalKey("uuid")` it is the parent's `uuid`; `ForeignKey("owner_id")` picks the child's column (`HasMany`/`HasOne`).
+- Each call inserts a new row (it calls the child's `Save()`). To change an existing child, set its foreign key and call `Update()` on it.
+- `HasManyMorph.Attach` calls the child's `DB(ctx)` again before saving. The child keeps its own fields only when its `DB()` copies the receiver, as in [Mixins / Concerns](concerns.md) (`entry := &_entry`). With `entry := &Entry{}` the fields are lost, so use `Save` there.
+- Up to v0.1.12, `HasMany.Attach` panicked (`interface {} is nil, not int64`), and `HasOne.Save` and `HasManyMorph.Save` did not set the foreign key. Use `HasMany.Save` (or `HasManyMorph.Attach`) on those versions.
 
 
 ## Query modifiers

@@ -10,12 +10,14 @@ Going is built on top of Go's standard library and provides an opinionated, conv
 
 | File | Description |
 |------|-------------|
+| [Application layers](going_docs/layers.md) | Folder layout: db, mixins, model, domain commands, infrastructure, listeners, DI |
 | [Authentication](going_docs/authentication.md) | JWT-based login, logout, and user sessions |
 | [CLI Commands](going_docs/cli.md) | Code generation commands (`make:controller`, `make:model`, etc.) |
 | [Collections](going_docs/collections.md) | Generic `Collection[T]` type |
 | [Concerns / Mixins](going_docs/concerns.md) | Composition patterns and polymorphic associations |
 | [DI Container](going_docs/container.md) | Dependency injection for controllers |
 | [Database / ORM](going_docs/db.md) | ActiveRecord ORM, queries, pagination |
+| [Events](going_docs/events.md) | Domain event dispatcher, listeners, publishing |
 | [Jobs](going_docs/jobs.md) | Background job scheduler |
 | [Middleware](going_docs/middleware.md) | HTTP middleware and middleware groups |
 | [Migration](going_docs/migration.md) | Database migrations (SQLite, PostgreSQL) |
@@ -43,5 +45,6 @@ Going follows a Laravel/Rails-inspired MVC architecture:
 8. **Auth**: Cookie-based JWT with bcrypt password hashing
 9. **WebSocket**: Hub-based architecture with rooms and event routing
 10. **Background Jobs**: Ticker-based scheduler with overlap prevention
-11. **CLI**: Cobra-based `make:` commands for code generation
-12. **Views**: Dual view system - Inertia.js or server-side Go templates
+11. **Domain Events**: Publish/subscribe dispatcher for DDD side effects, recorded on models and published by commands
+12. **CLI**: Cobra-based `make:` commands for code generation
+13. **Views**: Dual view system - Inertia.js or server-side Go templates

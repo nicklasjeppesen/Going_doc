@@ -2,12 +2,14 @@
 //
 // Documentation files:
 //
+//   - layers.md          - Application layers (db, mixins, model, domain, infrastructure, listeners)
 //   - authentication.md  - JWT-based authentication, login, logout
 //   - cli.md             - CLI commands (make:controller, make:model, migrate, etc.)
 //   - collections.md     - Generic Collection[T] type
 //   - concerns.md        - Mixins and polymorphic associations
 //   - container.md       - Dependency injection container
 //   - db.md              - ActiveRecord ORM, queries, pagination
+//   - events.md          - Domain event dispatcher and listeners
 //   - jobs.md            - Background job scheduler
 //   - migration.md       - Database migrations
 //   - middleware.md       - HTTP middleware

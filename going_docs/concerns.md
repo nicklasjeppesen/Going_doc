@@ -6,6 +6,7 @@
   - [Step 2: Create the mixin struct](#step-2-create-the-mixin-struct)
   - [Step 3: Create the repository](#step-3-create-the-repository)
   - [Usage](#usage)
+- [Case: Recording domain events](#case-recording-domain-events)
 
 
 ## Introduction
@@ -151,3 +152,44 @@ fmt.Println(userImage[0].Name)
 userService.Name = "Nicklas"
 userService.Update() // or .Save() for storing a new entry
 ```
+
+
+## Case: Recording domain events
+
+Some behaviour every model needs is built into `ActiveRecord` itself, so it needs no mixin. Recording domain events is one: every model has `Record(event)` and `ReleaseEvents()`, and is an `events.Recorder` (`super/events`). A method can then say what happened without publishing anything. The code that saved the model publishes the events afterwards, see [Recording events on the model](events.md#recording-events-on-the-model).
+
+### The model
+
+A rich model that embeds a row gets the methods through it, next to its other concerns:
+
+```go
+type Todo struct {
+    *db.Todo // embeds ActiveRecord[*db.Todo]: Record and ReleaseEvents
+    mixins.Fileable[*db.Todo]
+}
+
+func (t *Todo) Trash(at time.Time) bool {
+    if t.Trashed() {
+        return false
+    }
+    t.Trashed_at = stamp(at)
+    t.Record(TodoTrashed{TodoID: t.Id, Title: t.Title})
+    return true
+}
+```
+
+### Usage
+
+```go
+t, _ := todos.Find(ctx, id)
+if t.Trash(time.Now()) {
+    todos.Save(ctx, t)                              // save first
+    publisher.PublishAll(ctx, t.ReleaseEvents()...) // then publish what was recorded
+}
+```
+
+Things to know:
+
+- `Save()` and `Update()` never publish and never write the events. They are kept in an unexported field, so they are no column and are not in `ToJson()`.
+- `ReleaseEvents()` empties the list, so the same event is never published twice.
+- `DB(ctx)` keeps the events when it copies its receiver (`picture := &_picture`, as in the example above). Rows loaded with `First()` or `Get()` start without events.
